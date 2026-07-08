@@ -1,0 +1,55 @@
+{
+  "name": "pi-focus-guard",
+  "version": "0.1.0",
+  "description": "Pi extension that groups discuss, write, and commit guards under focus-prefixed commands.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cgint/pi-focus-guard.git"
+  },
+  "author": "cgint",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "coding-agent",
+    "extension",
+    "focus",
+    "write-protection",
+    "discussion",
+    "commit-guard"
+  ],
+  "files": [
+    "index.ts",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "dependencies": {
+    "unbash": "^4.0.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.74.0",
+    "@earendil-works/pi-tui": "*",
+    "@sinclair/typebox": "*"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "precommit": "tsc --noEmit && npm run test && npm audit --audit-level=moderate"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.80.3",
+    "@types/node": "^22.0.0",
+    "vitest": "^3.0.0",
+    "typescript": "^5.0.0"
+  }
+}
