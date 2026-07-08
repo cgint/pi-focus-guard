@@ -81,8 +81,86 @@ describe("focus command surface", () => {
 
   it("registers legacy flags for parity", () => {
     expect(pi.registerFlag).toHaveBeenCalledWith("write-guard", expect.objectContaining({ type: "string" }));
+    expect(pi.registerFlag).toHaveBeenCalledWith("write-guard-all", expect.objectContaining({ type: "boolean" }));
+    expect(pi.registerFlag).toHaveBeenCalledWith("write-guard-off", expect.objectContaining({ type: "boolean" }));
+    expect(pi.registerFlag).toHaveBeenCalledWith("dm-off", expect.objectContaining({ type: "boolean" }));
     expect(pi.registerFlag).toHaveBeenCalledWith("dm-read", expect.objectContaining({ type: "boolean" }));
     expect(pi.registerFlag).toHaveBeenCalledWith("dm-block", expect.objectContaining({ type: "boolean" }));
+    expect(pi.registerFlag).toHaveBeenCalledWith("commit-guard", expect.objectContaining({ type: "boolean" }));
+    expect(pi.registerFlag).toHaveBeenCalledWith("commit-guard-on", expect.objectContaining({ type: "boolean" }));
+    expect(pi.registerFlag).toHaveBeenCalledWith("commit-guard-off", expect.objectContaining({ type: "boolean" }));
+  });
+});
+
+describe("startup flags", () => {
+  let pi: any;
+
+  beforeEach(() => {
+    pi = createPiMock();
+    focusGuard(pi);
+  });
+
+  async function sessionStart(ctx = createCtx()) {
+    await pi._callbacks.session_start[0]({}, ctx);
+    return ctx;
+  }
+
+  it("starts discuss mode off with --dm-off even when a persisted mode exists", async () => {
+    pi._setFlag("dm-off", true);
+    const ctx = await sessionStart(createCtx({
+      sessionManager: {
+        getEntries: vi.fn().mockReturnValue([
+          { type: "custom", customType: "discuss-mode", data: { mode: "block", explicit: true } },
+        ]),
+      },
+    }));
+
+    expect(ctx.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "✅");
+  });
+
+  it("starts write guard off with --write-guard-off even when a persisted allowlist exists", async () => {
+    pi._setFlag("write-guard-off", true);
+    await sessionStart(createCtx({
+      sessionManager: {
+        getEntries: vi.fn().mockReturnValue([
+          { type: "custom", customType: "write-guard", data: { mode: "allow", dirs: ["docs"] } },
+        ]),
+      },
+    }));
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "write", input: { path: "/outside/file.txt", content: "data" } },
+      createCtx(),
+    );
+
+    expect(result).toBeUndefined();
+  });
+
+  it("starts commit guard on with --commit-guard", async () => {
+    pi._setFlag("commit-guard", true);
+    await sessionStart();
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "bash", input: { command: "git commit -m test" } },
+      createCtx(),
+    );
+
+    expect(result).toEqual({ block: true, reason: formatCommitGuardBlockedReason() });
+  });
+
+  it("starts commit guard off with --commit-guard-off even when persisted enabled", async () => {
+    pi._setFlag("commit-guard-off", true);
+    await sessionStart(createCtx({
+      sessionManager: {
+        getEntries: vi.fn().mockReturnValue([
+          { type: "custom", customType: "focus-commit-guard", data: { enabled: true } },
+        ]),
+      },
+    }));
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "bash", input: { command: "git commit -m test" } },
+      createCtx(),
+    );
+
+    expect(result).toBeUndefined();
   });
 });
 

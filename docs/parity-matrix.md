@@ -20,6 +20,22 @@ Rule: existing `pi-write-guard` and `pi-discuss-mode` behavior is ported without
 | `/focus-commit-guard-on` | New: block bash commands containing `git commit` | Implemented |
 | `/focus-commit-guard-off` | New: allow `git commit` again | Implemented |
 
+## Startup flags
+
+| Flag | Behavior | Status |
+|---|---|---|
+| `--write-guard <dirs>` | Start with write guard allowlist from legacy-compatible flag/config path. | Preserved |
+| `--write-guard-all` | Start with write guard disabled. | Implemented |
+| `--write-guard-off` | Start with write guard disabled. | Implemented |
+| `--dm-off` | Start with discuss mode disabled; overrides persisted discuss state. | Implemented |
+| `--dm-read` | Start in discuss read-only mode. | Preserved |
+| `--dm-block` | Start in discuss block mode. | Preserved |
+| `--commit-guard` | Start with commit guard enabled. | Implemented |
+| `--commit-guard-on` | Start with commit guard enabled. | Implemented |
+| `--commit-guard-off` | Start with commit guard disabled; overrides persisted commit state. | Implemented |
+
+Precedence: explicit `off` flags override enabled/read/block flags and persisted state for the same guard.
+
 ## Footer status
 
 | Guard | Source key/icon behavior | Focus target | Status |
@@ -44,6 +60,7 @@ Rule: existing `pi-write-guard` and `pi-discuss-mode` behavior is ported without
 | Discuss persistence/status | Discuss mode session override is persisted and footer status updates. | `discuss mode parity > persists discuss mode and updates status` |
 | Commit guard status | `/focus-commit-guard` prints status. | `commit guard > reports status through /focus-commit-guard` |
 | Commit guard footer | Footer icon reflects enabled/disabled state. | `commit guard > enables via /focus-commit-guard-on and updates footer status` |
+| Startup flags | Startup flags set initial discuss, write, and commit guard modes with explicit off precedence. | `startup flags > ...` tests in `test/focus-guard.test.ts` |
 
 ## Helper regression coverage
 
@@ -55,7 +72,7 @@ Original helper-level regression coverage has been ported into `pi-focus-guard` 
 | `test/write-config.test.ts` | `../pi-write-guard/test/config.test.ts` |
 | `test/discuss-config.test.ts` | `../pi-discuss-mode/test/config.test.ts` plus combined-extension exports |
 
-Current verification: `npm run precommit` runs 96 Vitest tests across focus behavior and helper regression coverage.
+Current verification: `npm run precommit` runs the focus behavior tests, startup flag tests, and helper regression coverage.
 
 ## Exact-copy audit
 

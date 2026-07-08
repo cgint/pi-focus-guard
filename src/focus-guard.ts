@@ -100,6 +100,21 @@ export default function focusGuard(pi: ExtensionAPI) {
     type: "string",
   });
 
+  pi.registerFlag("write-guard-all", {
+    description: "Start session with write guard disabled",
+    type: "boolean",
+  });
+
+  pi.registerFlag("write-guard-off", {
+    description: "Start session with write guard disabled",
+    type: "boolean",
+  });
+
+  pi.registerFlag("dm-off", {
+    description: "Start session with discuss mode disabled",
+    type: "boolean",
+  });
+
   pi.registerFlag("dm-read", {
     description: "Start session in discuss read-only mode (shortcut for --discuss-mode read)",
     type: "boolean",
@@ -107,6 +122,21 @@ export default function focusGuard(pi: ExtensionAPI) {
 
   pi.registerFlag("dm-block", {
     description: "Start session in discuss block mode (shortcut for --discuss-mode block)",
+    type: "boolean",
+  });
+
+  pi.registerFlag("commit-guard", {
+    description: "Start session with commit guard enabled",
+    type: "boolean",
+  });
+
+  pi.registerFlag("commit-guard-on", {
+    description: "Start session with commit guard enabled",
+    type: "boolean",
+  });
+
+  pi.registerFlag("commit-guard-off", {
+    description: "Start session with commit guard disabled",
     type: "boolean",
   });
 
@@ -381,9 +411,31 @@ export default function focusGuard(pi: ExtensionAPI) {
       }
     }
 
+    const writeOff = pi.getFlag("write-guard-off") || pi.getFlag("write-guard-all");
+    if (writeOff) {
+      writeSessionOverride = { mode: "off" };
+      persistWriteOverride();
+      if (ctx.hasUI) {
+        await pi.sendMessage(
+          { customType: WRITE_PERSIST_TYPE, content: "Write guard disabled by startup flag — no write restrictions for this session.", display: true },
+          { triggerTurn: false },
+        );
+      }
+    }
+
+    const dmOff = pi.getFlag("dm-off");
     const dmBlock = pi.getFlag("dm-block");
     const dmRead = pi.getFlag("dm-read");
-    if (dmBlock) {
+    if (dmOff) {
+      setDiscussMode("off");
+      updateDiscussStatus(ctx, "off");
+      if (ctx.hasUI) {
+        await pi.sendMessage(
+          { customType: DISCUSS_PERSIST_TYPE, content: "Strict-Discuss mode disabled by startup flag.", display: true },
+          { triggerTurn: false },
+        );
+      }
+    } else if (dmBlock) {
       setDiscussMode("block");
       updateDiscussStatus(ctx, "block");
       if (ctx.hasUI) {
@@ -410,10 +462,30 @@ export default function focusGuard(pi: ExtensionAPI) {
       }
     }
 
+    const commitOff = pi.getFlag("commit-guard-off");
+    const commitOn = pi.getFlag("commit-guard") || pi.getFlag("commit-guard-on");
     const lastCommit = entries
       .filter((e: { type: string; customType?: string }) => e.type === "custom" && e.customType === COMMIT_PERSIST_TYPE)
       .pop() as { data?: { enabled?: boolean } } | undefined;
-    if (lastCommit?.data) {
+    if (commitOff) {
+      commitGuardEnabled = false;
+      persistCommitGuard();
+      if (ctx.hasUI) {
+        await pi.sendMessage(
+          { customType: COMMIT_PERSIST_TYPE, content: "Commit guard disabled by startup flag — git commit is not blocked by focus guard.", display: true },
+          { triggerTurn: false },
+        );
+      }
+    } else if (commitOn) {
+      commitGuardEnabled = true;
+      persistCommitGuard();
+      if (ctx.hasUI) {
+        await pi.sendMessage(
+          { customType: COMMIT_PERSIST_TYPE, content: "Commit guard enabled by startup flag — git commit is blocked until collaborative review is complete.", display: true },
+          { triggerTurn: false },
+        );
+      }
+    } else if (lastCommit?.data) {
       commitGuardEnabled = lastCommit.data.enabled === true;
     }
 

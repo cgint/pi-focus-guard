@@ -37,6 +37,22 @@ The intended command shape is:
 /focus-commit-guard-off
 ```
 
+Startup flags can set the initial mode:
+
+```text
+--write-guard <dirs>
+--write-guard-all
+--write-guard-off
+--dm-off
+--dm-read
+--dm-block
+--commit-guard
+--commit-guard-on
+--commit-guard-off
+```
+
+Explicit `off` flags override persisted state for their guard.
+
 ## Scope
 
 ### Preserve existing behavior while porting
@@ -82,7 +98,7 @@ Those older extensions can be deprecated later after parity is verified.
 
 - Do not redesign write-guard policy semantics.
 - Do not redesign discuss-mode policy semantics.
-- Do not silently add new config precedence rules.
+- Do not silently add new config precedence rules; startup flag precedence is explicit: off flags override on/read/block flags and persisted state for that guard.
 - Do not keep legacy command names unless explicitly chosen later.
 - Do not treat denied writes or blocked commits as errors to work around.
 
@@ -91,6 +107,7 @@ Those older extensions can be deprecated later after parity is verified.
 Before treating this successor as ready, tests should show parity for:
 
 - focus-prefixed command registration;
+- startup flag registration and initial-mode behavior;
 - write/edit path allowlist blocking;
 - bash write detection;
 - discuss block mode;
