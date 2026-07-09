@@ -43,6 +43,9 @@ describe("discuss getEffectivePolicy", () => {
 describe("discuss isToolAllowedByPolicy", () => {
   const EXPECTED_READ_MODE_ALLOWED = new Set([
     "read",
+    "ls",
+    "find",
+    "grep",
     "advisor",
     "web_search",
     "fetch_content",
@@ -67,6 +70,13 @@ describe("discuss isToolAllowedByPolicy", () => {
     expect(isToolAllowedByPolicy("bash", { enforce: true, mode: "block" })).toBe(false);
     expect(isToolAllowedByPolicy("edit", { enforce: true, mode: "block" })).toBe(false);
     expect(isToolAllowedByPolicy("write", { enforce: true, mode: "block" })).toBe(false);
+  });
+
+  it("allows ls, find, grep built-in tools in read mode", () => {
+    const readMode: EffectivePolicy = { enforce: true, mode: "read" };
+    expect(isToolAllowedByPolicy("ls", readMode)).toBe(true);
+    expect(isToolAllowedByPolicy("find", readMode)).toBe(true);
+    expect(isToolAllowedByPolicy("grep", readMode)).toBe(true);
   });
 
   it("allows only the expected read-mode tools and blocks write-capable ones", () => {

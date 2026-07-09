@@ -47,6 +47,9 @@ const POLICY_CLOSE =
 
 export const READ_MODE_ALLOWED_TOOLS = new Set([
   "read",
+  "ls",
+  "find",
+  "grep",
   "advisor",
   "web_search",
   "fetch_content",
