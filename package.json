@@ -32,9 +32,6 @@
       "./index.ts"
     ]
   },
-  "dependencies": {
-    "unbash": "^4.0.0"
-  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": ">=0.74.0",
     "@earendil-works/pi-tui": "*",
@@ -47,9 +44,12 @@
     "precommit": "tsc --noEmit && npm run test && npm audit --audit-level=moderate"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.80.3",
-    "@types/node": "^22.0.0",
-    "vitest": "^3.0.0",
-    "typescript": "^5.0.0"
+    "@earendil-works/pi-coding-agent": "^0.80.10",
+    "@earendil-works/pi-tui": "^0.80.10",
+    "@sinclair/typebox": "^0.34.52",
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2",
+    "unbash": "^4.0.3",
+    "vitest": "^4.1.10"
   }
 }
