@@ -32,6 +32,10 @@
       "./index.ts"
     ]
   },
+  "type": "module",
+  "dependencies": {
+    "unbash": "^4.0.3"
+  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": ">=0.74.0",
     "@earendil-works/pi-tui": "*",
@@ -49,7 +53,6 @@
     "@sinclair/typebox": "^0.34.52",
     "@types/node": "^26.1.1",
     "typescript": "^7.0.2",
-    "unbash": "^4.0.3",
     "vitest": "^4.1.10"
   }
 }
