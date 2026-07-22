@@ -23,6 +23,17 @@ The old extensions solve related problems but appear as unrelated command famili
 
 In practice, both are focus controls: they communicate user intent about the current collaboration phase. A unified extension reduces command discovery friction and makes session state easier to reason about.
 
+## North Star & Philosophy
+
+`pi-focus-guard` is grounded in a meta-level vision for human-agent pairing: **focus controls are semantic collaboration signals, not cold security blockades.**
+
+* **Shared Situational Awareness:** Cold filesystem restrictions (like read-only OS sandboxes) give zero semantic context, causing AI agents to view boundaries as technical bugs to route around. `pi-focus-guard` communicates *why* a boundary exists, telling a clear narrative story across collaboration phases.
+* **Telling a Story:** Every guard banner and reminder message explicitly frames boundaries as policy agreements ("*Treat denied writes as policy boundaries, not technical failures to route around*").
+* **Honest Progress Over Cheap Shortcuts:** We reject fast, superficial mini-solutions and hacks in favor of verified, high-quality, durable progress.
+* **Iterative Hardening:** We continuously observe what works in practice, prune friction that adds no value, and harden the mechanisms that build mutual trust and reliability.
+
+For the detailed meta-level framework on agentic agency and trust, see [`docs/philosophy-and-north-star.md`](docs/philosophy-and-north-star.md).
+
 The intended command shape is:
 
 ```text
