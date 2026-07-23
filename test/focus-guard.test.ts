@@ -308,12 +308,79 @@ describe("discuss mode parity", () => {
     expect(result).toEqual({ action: "transform", text: "inspect the repository", images: undefined });
     expect(ctx.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "📖");
     expect(pi.appendEntry).toHaveBeenCalledWith("discuss-mode", { mode: "read", explicit: true });
+    expect(pi._messages.at(-1)).toEqual(expect.objectContaining({
+      msg: expect.objectContaining({
+        customType: "discuss-mode",
+        content: expect.stringContaining("Strict-Discuss mode started by user in READ-ONLY-mode."),
+        display: true,
+      }),
+      opts: { triggerTurn: false },
+    }));
 
     const toolResult = await pi._callbacks.tool_call[0](
       { toolName: "write", input: { path: "/project/file.txt", content: "data" } },
       ctx,
     );
     expect(toolResult).toEqual(expect.objectContaining({ block: true }));
+  });
+
+  it("defers a queued inline transition until its user message starts", async () => {
+    const ctx = createCtx();
+    const result = await pi._callbacks.input[0]({
+      type: "input",
+      text: "-dr: hello",
+      source: "interactive",
+      streamingBehavior: "followUp",
+    }, ctx);
+
+    expect(result).toEqual({ action: "transform", text: "hello", images: undefined });
+    expect(ctx.ui.setStatus).not.toHaveBeenCalledWith("a1_discuss", "📖");
+    expect(await pi._callbacks.tool_call[0]({ toolName: "write", input: { path: "/project/file.txt", content: "data" } }, ctx)).toBeUndefined();
+
+    await pi._callbacks.message_start[0]({ type: "message_start", message: { role: "user", content: "hello" } }, ctx);
+
+    expect(ctx.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "📖");
+    expect(await pi._callbacks.tool_call[0]({ toolName: "write", input: { path: "/project/file.txt", content: "data" } }, ctx)).toEqual(expect.objectContaining({ block: true }));
+    expect(pi._messages.at(-1)).toEqual(expect.objectContaining({
+      msg: expect.objectContaining({ customType: "discuss-mode", content: expect.stringContaining("Strict-Discuss mode started by user in READ-ONLY-mode.") }),
+      opts: expect.objectContaining({ deliverAs: "steer" }),
+    }));
+  });
+
+  it("activates a steer directive immediately", async () => {
+    const ctx = createCtx();
+    await pi._callbacks.input[0]({
+      type: "input",
+      text: "-dr: steer now",
+      source: "interactive",
+      streamingBehavior: "steer",
+    }, ctx);
+
+    expect(ctx.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "📖");
+    expect(pi._messages.at(-1)).toEqual(expect.objectContaining({
+      msg: expect.objectContaining({ customType: "discuss-mode" }),
+      opts: { triggerTurn: false },
+    }));
+  });
+
+  it("keeps deferred transitions aligned with every queued follow-up", async () => {
+    const ctx = createCtx();
+    await pi._callbacks.input[0]({ type: "input", text: "plain follow-up", source: "interactive", streamingBehavior: "followUp" }, ctx);
+    await pi._callbacks.input[0]({ type: "input", text: "-dr: read follow-up", source: "interactive", streamingBehavior: "followUp" }, ctx);
+
+    await pi._callbacks.message_start[0]({ type: "message_start", message: { role: "user", content: "plain follow-up" } }, ctx);
+    expect(ctx.ui.setStatus).not.toHaveBeenCalledWith("a1_discuss", "📖");
+    await pi._callbacks.message_start[0]({ type: "message_start", message: { role: "user", content: "read follow-up" } }, ctx);
+    expect(ctx.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "📖");
+  });
+
+  it("clears deferred transitions when the agent settles", async () => {
+    const ctx = createCtx();
+    await pi._callbacks.input[0]({ type: "input", text: "-dr: discarded", source: "interactive", streamingBehavior: "followUp" }, ctx);
+    await pi._callbacks.agent_settled[0]({}, ctx);
+
+    await pi._callbacks.message_start[0]({ type: "message_start", message: { role: "user", content: "later prompt" } }, ctx);
+    expect(ctx.ui.setStatus).not.toHaveBeenCalledWith("a1_discuss", "📖");
   });
 
   it("handles a directive-only request without starting an agent turn", async () => {

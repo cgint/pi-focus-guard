@@ -186,18 +186,34 @@ export default function focusGuard(pi: ExtensionAPI) {
     persistDiscussOverride();
   }
 
-  function applyInlineDiscussMode(mode: DiscussMode, ctx: ExtensionContext): void {
+  function discussModeMessage(mode: DiscussMode): string {
+    if (mode === "off") return "Strict-Discuss mode ended by user.";
+    if (mode === "block") return "Strict-Discuss mode started by user in BLOCK-mode. Let's align conceptually first. We are strictly stepping back from any tools to discuss ideas, architecture, or goals.";
+    return `Strict-Discuss mode started by user in READ-ONLY-mode. Let's investigate together first. We want to read and inspect the information at hand to build a shared understanding, but hold off on making any changes yet. Allowed tools: ${READ_MODE_ALLOWED_DISPLAY}`;
+  }
+
+  async function activateDiscussMode(
+    mode: DiscussMode,
+    ctx: ExtensionContext,
+    delivery: "immediate" | "queued" = "immediate",
+  ): Promise<void> {
     setDiscussMode(mode);
     updateDiscussStatus(ctx, mode);
 
-    if (!ctx.hasUI) return;
-    if (mode === "off") {
-      ctx.ui.notify("Discuss mode disabled for this session.", "info");
-    } else if (mode === "block") {
-      ctx.ui.notify("Discuss mode set to BLOCK for this session. All tool calls will be blocked.", "info");
-    } else {
-      ctx.ui.notify(`Discuss mode set to READ-ONLY for this session. Allowed tools: ${READ_MODE_ALLOWED_DISPLAY}.`, "info");
+    if (ctx.hasUI) {
+      if (mode === "off") {
+        ctx.ui.notify("Discuss mode disabled for this session.", "info");
+      } else if (mode === "block") {
+        ctx.ui.notify("Discuss mode set to BLOCK for this session. All tool calls will be blocked.", "info");
+      } else {
+        ctx.ui.notify(`Discuss mode set to READ-ONLY for this session. Allowed tools: ${READ_MODE_ALLOWED_DISPLAY}.`, "info");
+      }
     }
+
+    await pi.sendMessage(
+      { customType: DISCUSS_PERSIST_TYPE, content: discussModeMessage(mode), display: true },
+      delivery === "queued" ? { triggerTurn: false, deliverAs: "steer" } : { triggerTurn: false },
+    );
   }
 
   async function setCommitGuard(enabled: boolean, ctx: ExtensionContext): Promise<void> {
@@ -299,41 +315,17 @@ export default function focusGuard(pi: ExtensionAPI) {
       }
 
       if (argsTrimmed === "off" || argsTrimmed === "disable") {
-        setDiscussMode("off");
-        updateDiscussStatus(ctx, "off");
-        if (ctx.hasUI) {
-          ctx.ui.notify("Discuss mode disabled for this session.", "info");
-          pi.sendMessage(
-            { customType: DISCUSS_PERSIST_TYPE, content: "Strict-Discuss mode ended by user.", display: true },
-            { triggerTurn: false },
-          );
-        }
+        await activateDiscussMode("off", ctx);
         return;
       }
 
       if (argsTrimmed === "block" || argsTrimmed === "on" || argsTrimmed === "enable") {
-        setDiscussMode("block");
-        updateDiscussStatus(ctx, "block");
-        if (ctx.hasUI) {
-          ctx.ui.notify("Discuss mode set to BLOCK for this session. All tool calls will be blocked.", "info");
-          pi.sendMessage(
-            { customType: DISCUSS_PERSIST_TYPE, content: "Strict-Discuss mode started by user in BLOCK-mode. Let's align conceptually first. We are strictly stepping back from any tools to discuss ideas, architecture, or goals.", display: true },
-            { triggerTurn: false },
-          );
-        }
+        await activateDiscussMode("block", ctx);
         return;
       }
 
       if (argsTrimmed === "read" || argsTrimmed === "readonly" || argsTrimmed === "read-only") {
-        setDiscussMode("read");
-        updateDiscussStatus(ctx, "read");
-        if (ctx.hasUI) {
-          ctx.ui.notify(`Discuss mode set to READ-ONLY for this session. Allowed tools: ${READ_MODE_ALLOWED_DISPLAY}.`, "info");
-          pi.sendMessage(
-            { customType: DISCUSS_PERSIST_TYPE, content: `Strict-Discuss mode started by user in READ-ONLY-mode. Let's investigate together first. We want to read and inspect the information at hand to build a shared understanding, but hold off on making any changes yet. Allowed tools: ${READ_MODE_ALLOWED_DISPLAY}`, display: true },
-            { triggerTurn: false },
-          );
-        }
+        await activateDiscussMode("read", ctx);
         return;
       }
 
@@ -346,65 +338,66 @@ export default function focusGuard(pi: ExtensionAPI) {
   pi.registerCommand("focus-discuss-off", {
     description: "Disable discuss mode (allow all tools). Shortcut for /focus-discuss off",
     handler: async (_args, ctx) => {
-      setDiscussMode("off");
-      updateDiscussStatus(ctx, "off");
-      if (ctx.hasUI) {
-        ctx.ui.notify("Discuss mode disabled for this session.", "info");
-        pi.sendMessage(
-          { customType: DISCUSS_PERSIST_TYPE, content: "Strict-Discuss mode ended by user.", display: true },
-          { triggerTurn: false },
-        );
-      }
+      await activateDiscussMode("off", ctx);
     },
   });
 
   pi.registerCommand("focus-discuss-read", {
     description: "Conservative read-only mode. Shortcut for /focus-discuss read",
     handler: async (_args, ctx) => {
-      setDiscussMode("read");
-      updateDiscussStatus(ctx, "read");
-      if (ctx.hasUI) {
-        ctx.ui.notify(`Discuss mode set to READ-ONLY for this session. Allowed tools: ${READ_MODE_ALLOWED_DISPLAY}.`, "info");
-        pi.sendMessage(
-          { customType: DISCUSS_PERSIST_TYPE, content: `Strict-Discuss mode started by user in READ-ONLY-mode. Let's investigate together first. We want to read and inspect the information at hand to build a shared understanding, but hold off on making any changes yet. Allowed tools: ${READ_MODE_ALLOWED_DISPLAY}`, display: true },
-          { triggerTurn: false },
-        );
-      }
+      await activateDiscussMode("read", ctx);
     },
   });
 
   pi.registerCommand("focus-discuss-block", {
     description: "Block all tool calls (full discuss mode). Shortcut for /focus-discuss block",
     handler: async (_args, ctx) => {
-      setDiscussMode("block");
-      updateDiscussStatus(ctx, "block");
-      if (ctx.hasUI) {
-        ctx.ui.notify("Discuss mode set to BLOCK for this session. All tool calls will be blocked.", "info");
-        pi.sendMessage(
-          { customType: DISCUSS_PERSIST_TYPE, content: "Strict-Discuss mode started by user in BLOCK-mode. Let's align conceptually first. We are strictly stepping back from any tools to discuss ideas, architecture, or goals.", display: true },
-          { triggerTurn: false },
-        );
-      }
+      await activateDiscussMode("block", ctx);
     },
   });
+
+  const deferredFollowUps: Array<{ mode?: DiscussMode }> = [];
 
   pi.on("input", async (event, ctx) => {
     if (event.source === "extension") return { action: "continue" };
 
     const parsed = parseDiscussInputDirective(event.text);
     if ("multiple" in parsed) {
+      if (event.streamingBehavior === "followUp") deferredFollowUps.push({});
       if (ctx.hasUI) {
         ctx.ui.notify("Multiple discuss-mode directives found. Use only one of -do:, -db:, or -dr:.", "warning");
       }
       return { action: "continue" };
     }
 
-    if (!("mode" in parsed)) return { action: "continue" };
+    if (!("mode" in parsed)) {
+      if (event.streamingBehavior === "followUp") deferredFollowUps.push({});
+      return { action: "continue" };
+    }
 
-    applyInlineDiscussMode(parsed.mode, ctx);
+    if (event.streamingBehavior === "followUp") {
+      deferredFollowUps.push({ mode: parsed.mode });
+    } else {
+      await activateDiscussMode(parsed.mode, ctx);
+    }
     if (!parsed.text.trim()) return { action: "handled" };
 
     return { action: "transform", text: parsed.text, images: event.images };
+  });
+
+  pi.on("message_start", async (event, ctx) => {
+    if (event.message.role !== "user" || deferredFollowUps.length === 0) return;
+
+    const deferred = deferredFollowUps.shift();
+    if (deferred?.mode) await activateDiscussMode(deferred.mode, ctx, "queued");
+  });
+
+  pi.on("agent_settled", () => {
+    deferredFollowUps.length = 0;
+  });
+
+  pi.on("session_shutdown", () => {
+    deferredFollowUps.length = 0;
   });
 
   pi.registerCommand("focus-commit-guard", {
@@ -431,6 +424,7 @@ export default function focusGuard(pi: ExtensionAPI) {
   });
 
   pi.on("session_start", async (_event, ctx) => {
+    deferredFollowUps.length = 0;
     const entries = ctx.sessionManager.getEntries();
 
     const lastWrite = entries

@@ -19,7 +19,7 @@ Rule: existing `pi-write-guard` and `pi-discuss-mode` behavior is ported without
 | `/focus-commit-guard` | New: show commit guard status | Implemented |
 | `/focus-commit-guard-on` | New: block bash commands containing `git commit` | Implemented |
 | `/focus-commit-guard-off` | New: allow `git commit` again | Implemented |
-| `-do:`, `-db:`, `-dr:` input directives | New: switch discuss mode before processing the same request | Implemented |
+| `-do:`, `-db:`, `-dr:` input directives | New: switch discuss mode before processing the same request; queued follow-ups activate when their request begins | Implemented |
 
 ## Startup flags
 
@@ -62,7 +62,7 @@ Precedence: explicit `off` flags override enabled/read/block flags and persisted
 | Commit guard status | `/focus-commit-guard` prints status. | `commit guard > reports status through /focus-commit-guard` |
 | Commit guard footer | Footer icon reflects enabled/disabled state. | `commit guard > enables via /focus-commit-guard-on and updates footer status` |
 | Startup flags | Startup flags set initial discuss, write, and commit guard modes with explicit off precedence. | `startup flags > ...` tests in `test/focus-guard.test.ts` |
-| Inline directives | Prefix/trailing directives transform the request, apply mode first, reject duplicates, handle directive-only input, and ignore extension-generated input. | `test/discuss-input-directive.test.ts`; inline input tests in `test/focus-guard.test.ts` |
+| Inline directives | Prefix/trailing directives transform the request, apply mode at request start (including queued follow-ups), reject duplicates, handle directive-only input, ignore extension-generated input, and emit model-visible discuss-mode context. `off` is not persisted. | `test/discuss-input-directive.test.ts`; inline input tests in `test/focus-guard.test.ts` |
 
 ## Helper regression coverage
 
@@ -89,6 +89,12 @@ The following helper modules were copied byte-for-byte from source at port start
 | `src/discuss/bash-detect.ts` | `../pi-discuss-mode/src/bash-detect.ts` | Exact match |
 | `src/discuss/config.ts` | `../pi-discuss-mode/src/config.ts` | Exact match |
 | `src/discuss/is-readonly.ts` | `../pi-discuss-mode/src/is-readonly.ts` | Exact match |
+
+## Lifecycle invariant
+
+![Inline discuss-mode lifecycle](./inline-discuss-lifecycle.svg)
+
+An effective mode transition keeps enforcement, footer/UI status, mode-specific persistence, and model-visible `[discuss-mode]` custom context aligned. Follow-up directives are activated at their matching user `message_start`; queued metadata is FIFO-aligned with every follow-up and discarded when the agent settles or the session shuts down. `read` and `block` persist `{ mode, explicit: true }`; `off` is session-only and is not persisted.
 
 ## Explicit non-decisions
 

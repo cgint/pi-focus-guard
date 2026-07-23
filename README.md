@@ -77,6 +77,8 @@ Please investigate what needs to be done.
 
 The directive is removed before the request is processed. Only one directive is allowed per message. A directive-only message changes the mode without starting an agent turn. `-do:` matches `/focus-discuss-off`: it disables discuss mode for the current session but does not persist an `off` override. Inline directives are processed for interactive and RPC input, not extension-generated messages.
 
+Queued follow-up directives activate when their request begins, not when they are queued. Every effective discuss-mode transition updates enforcement and footer status, applies mode-specific persistence, and emits model-visible `[discuss-mode]` context. `off` remains a session-only override and is not persisted.
+
 ## Scope
 
 ### Preserve existing behavior while porting

@@ -1,0 +1,28 @@
+direction: down
+
+Input {
+  parse: "Parse and remove -do:/-db:/-dr:"
+  immediate: "steer or idle\nactivate now"
+  followup: "followUp\nqueue {text, mode?}"
+}
+
+Queue {
+  start: "matching user message_start"
+  activate: "activate mode\nupdate policy + UI + persistence"
+  context: "emit [discuss-mode]\ncustom message before next LLM call"
+}
+
+Cleanup {
+  settled: "agent_settled"
+  shutdown: "session_shutdown / session_start"
+  clear: "discard deferred metadata"
+}
+
+Input.parse -> Input.immediate: "not follow-up"
+Input.parse -> Input.followup: "follow-up"
+Input.followup -> Queue.start: "FIFO; every follow-up tracked"
+Queue.start -> Queue.activate: "mode present"
+Queue.activate -> Queue.context
+Input.followup -> Cleanup.clear: "queue cancelled"
+Cleanup.settled -> Cleanup.clear
+Cleanup.shutdown -> Cleanup.clear
