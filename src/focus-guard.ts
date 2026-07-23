@@ -17,6 +17,7 @@ import {
   type EffectivePolicy as DiscussEffectivePolicy,
 } from "./discuss/config.js";
 import { isBashCommandReadOnly } from "./discuss/is-readonly.js";
+import { parseDiscussInputDirective } from "./discuss/input-directive.js";
 
 const WRITE_PERSIST_TYPE = "write-guard";
 const DISCUSS_PERSIST_TYPE = "discuss-mode";
@@ -183,6 +184,20 @@ export default function focusGuard(pi: ExtensionAPI) {
   function setDiscussMode(mode: DiscussMode): void {
     activeDiscussMode = { mode, explicit: true };
     persistDiscussOverride();
+  }
+
+  function applyInlineDiscussMode(mode: DiscussMode, ctx: ExtensionContext): void {
+    setDiscussMode(mode);
+    updateDiscussStatus(ctx, mode);
+
+    if (!ctx.hasUI) return;
+    if (mode === "off") {
+      ctx.ui.notify("Discuss mode disabled for this session.", "info");
+    } else if (mode === "block") {
+      ctx.ui.notify("Discuss mode set to BLOCK for this session. All tool calls will be blocked.", "info");
+    } else {
+      ctx.ui.notify(`Discuss mode set to READ-ONLY for this session. Allowed tools: ${READ_MODE_ALLOWED_DISPLAY}.`, "info");
+    }
   }
 
   async function setCommitGuard(enabled: boolean, ctx: ExtensionContext): Promise<void> {
@@ -371,6 +386,25 @@ export default function focusGuard(pi: ExtensionAPI) {
         );
       }
     },
+  });
+
+  pi.on("input", async (event, ctx) => {
+    if (event.source === "extension") return { action: "continue" };
+
+    const parsed = parseDiscussInputDirective(event.text);
+    if ("multiple" in parsed) {
+      if (ctx.hasUI) {
+        ctx.ui.notify("Multiple discuss-mode directives found. Use only one of -do:, -db:, or -dr:.", "warning");
+      }
+      return { action: "continue" };
+    }
+
+    if (!("mode" in parsed)) return { action: "continue" };
+
+    applyInlineDiscussMode(parsed.mode, ctx);
+    if (!parsed.text.trim()) return { action: "handled" };
+
+    return { action: "transform", text: parsed.text, images: event.images };
   });
 
   pi.registerCommand("focus-commit-guard", {

@@ -2,7 +2,7 @@
 
 This document defines the initial port target for `pi-focus-guard` and records implementation evidence.
 
-Rule: existing `pi-write-guard` and `pi-discuss-mode` behavior is ported without semantic adaptation. New behavior is limited to the commit guard.
+Rule: existing `pi-write-guard` and `pi-discuss-mode` behavior is ported without semantic adaptation. New behavior includes the commit guard and inline discuss-mode directives.
 
 ## Command surface
 
@@ -19,6 +19,7 @@ Rule: existing `pi-write-guard` and `pi-discuss-mode` behavior is ported without
 | `/focus-commit-guard` | New: show commit guard status | Implemented |
 | `/focus-commit-guard-on` | New: block bash commands containing `git commit` | Implemented |
 | `/focus-commit-guard-off` | New: allow `git commit` again | Implemented |
+| `-do:`, `-db:`, `-dr:` input directives | New: switch discuss mode before processing the same request | Implemented |
 
 ## Startup flags
 
@@ -61,6 +62,7 @@ Precedence: explicit `off` flags override enabled/read/block flags and persisted
 | Commit guard status | `/focus-commit-guard` prints status. | `commit guard > reports status through /focus-commit-guard` |
 | Commit guard footer | Footer icon reflects enabled/disabled state. | `commit guard > enables via /focus-commit-guard-on and updates footer status` |
 | Startup flags | Startup flags set initial discuss, write, and commit guard modes with explicit off precedence. | `startup flags > ...` tests in `test/focus-guard.test.ts` |
+| Inline directives | Prefix/trailing directives transform the request, apply mode first, reject duplicates, handle directive-only input, and ignore extension-generated input. | `test/discuss-input-directive.test.ts`; inline input tests in `test/focus-guard.test.ts` |
 
 ## Helper regression coverage
 
@@ -71,6 +73,7 @@ Original helper-level regression coverage has been ported into `pi-focus-guard` 
 | `test/write-bash-detect.test.ts` | `../pi-write-guard/test/bash-detect.test.ts` |
 | `test/write-config.test.ts` | `../pi-write-guard/test/config.test.ts` |
 | `test/discuss-config.test.ts` | `../pi-discuss-mode/test/config.test.ts` plus combined-extension exports |
+| `test/discuss-input-directive.test.ts` | Inline discuss-mode directive parser and duplicate/match semantics |
 
 Current verification: `npm run precommit` runs the focus behavior tests, startup flag tests, and helper regression coverage.
 

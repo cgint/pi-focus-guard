@@ -296,6 +296,64 @@ describe("discuss mode parity", () => {
     expect(pi.appendEntry).toHaveBeenCalledWith("discuss-mode", { mode: "read", explicit: true });
     expect(ctx.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "📖");
   });
+
+  it("changes mode before processing a transformed inline request", async () => {
+    const ctx = createCtx();
+    const result = await pi._callbacks.input[0]({
+      type: "input",
+      text: "-dr: inspect the repository",
+      source: "interactive",
+    }, ctx);
+
+    expect(result).toEqual({ action: "transform", text: "inspect the repository", images: undefined });
+    expect(ctx.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "📖");
+    expect(pi.appendEntry).toHaveBeenCalledWith("discuss-mode", { mode: "read", explicit: true });
+
+    const toolResult = await pi._callbacks.tool_call[0](
+      { toolName: "write", input: { path: "/project/file.txt", content: "data" } },
+      ctx,
+    );
+    expect(toolResult).toEqual(expect.objectContaining({ block: true }));
+  });
+
+  it("handles a directive-only request without starting an agent turn", async () => {
+    const result = await pi._callbacks.input[0]({
+      type: "input",
+      text: "-db:",
+      source: "rpc",
+    }, createCtx());
+
+    expect(result).toEqual({ action: "handled" });
+    await expect(pi._callbacks.tool_call[0]({ toolName: "read", input: { path: "README.md" } }, createCtx())).resolves.toEqual(
+      expect.objectContaining({ block: true }),
+    );
+  });
+
+  it("keeps inline -do: as a non-persisted session override", async () => {
+    const result = await pi._callbacks.input[0]({
+      type: "input",
+      text: "-do: implement the change",
+      source: "interactive",
+    }, createCtx());
+
+    expect(result).toEqual({ action: "transform", text: "implement the change", images: undefined });
+    expect(pi.appendEntry).not.toHaveBeenCalledWith("discuss-mode", { mode: "off", explicit: true });
+  });
+
+  it("does not parse extension-generated messages", async () => {
+    const result = await pi._callbacks.input[0]({
+      type: "input",
+      text: "-dr: injected status",
+      source: "extension",
+    }, createCtx());
+
+    expect(result).toEqual({ action: "continue" });
+    const toolResult = await pi._callbacks.tool_call[0](
+      { toolName: "write", input: { path: "/project/file.txt", content: "data" } },
+      createCtx(),
+    );
+    expect(toolResult).toBeUndefined();
+  });
 });
 
 describe("commit guard", () => {

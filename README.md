@@ -64,6 +64,19 @@ Startup flags can set the initial mode:
 
 Explicit `off` flags override persisted state for their guard.
 
+Discuss mode can also be changed inline while submitting a request:
+
+```text
+-do: implement the change
+-db: explain the architecture
+-dr: investigate the issue
+
+Please investigate what needs to be done.
+-dr:
+```
+
+The directive is removed before the request is processed. Only one directive is allowed per message. A directive-only message changes the mode without starting an agent turn. `-do:` matches `/focus-discuss-off`: it disables discuss mode for the current session but does not persist an `off` override. Inline directives are processed for interactive and RPC input, not extension-generated messages.
+
 ## Scope
 
 ### Preserve existing behavior while porting
@@ -110,6 +123,7 @@ Those older extensions can be deprecated later after parity is verified.
 - Do not redesign write-guard policy semantics.
 - Do not redesign discuss-mode policy semantics.
 - Do not silently add new config precedence rules; startup flag precedence is explicit: off flags override on/read/block flags and persisted state for that guard.
+- Inline discuss directives change the current session mode without changing the existing persistence semantics.
 - Do not keep legacy command names unless explicitly chosen later.
 - Do not treat denied writes or blocked commits as errors to work around.
 
