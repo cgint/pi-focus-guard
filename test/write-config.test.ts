@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { getEffectivePolicy, parseFlagAllowedDirs, parseDirsArgList, loadProjectAllowedDirs } from "../src/write/config.js";
+import { getEffectivePolicy, parseFlagAllowedDirs, parseDirsArgList, loadProjectAllowedDirs, WriteGuardConfigError } from "../src/write/config.js";
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 
@@ -24,8 +24,8 @@ describe("write parseFlagAllowedDirs", () => {
 		expect(parseFlagAllowedDirs(" ./docs , ./openspec ")).toEqual(["./docs", "./openspec"]);
 	});
 
-	it("returns empty array for empty string", () => {
-		expect(parseFlagAllowedDirs("")).toEqual([]);
+	it("throws a configuration error for an empty string", () => {
+		expect(() => parseFlagAllowedDirs("")).toThrow(WriteGuardConfigError);
 	});
 
 	it("returns null for non-string input", () => {
@@ -69,12 +69,9 @@ describe("write getEffectivePolicy - PI_WRITE_GUARD_DIRS", () => {
 		expect(policy.dirs).toEqual(["./src", "./test"]);
 	});
 
-	it("enforces empty allowlist when env var is empty string", async () => {
+	it("throws a configuration error when env var is an empty string", async () => {
 		setEnv("PI_WRITE_GUARD_DIRS", "");
-		const policy = await getEffectivePolicy(undefined, null, FAKE_CWD);
-		expect(policy.enforce).toBe(true);
-		expect(policy.source).toBe("env");
-		expect(policy.dirs).toEqual([]);
+		await expect(getEffectivePolicy(undefined, null, FAKE_CWD)).rejects.toThrow(WriteGuardConfigError);
 	});
 
 	it("falls through to settings when env var is unset", async () => {
@@ -82,6 +79,15 @@ describe("write getEffectivePolicy - PI_WRITE_GUARD_DIRS", () => {
 		const policy = await getEffectivePolicy(undefined, null, FAKE_CWD);
 		expect(policy.enforce).toBe(false);
 		expect(policy.source).toBe("none");
+	});
+
+	it("rejects an empty env allowlist beneath a valid flag", async () => {
+		setEnv("PI_WRITE_GUARD_DIRS", "");
+		await expect(getEffectivePolicy("./flag-dir", null, FAKE_CWD)).rejects.toThrow(WriteGuardConfigError);
+	});
+
+	it("rejects an empty flag beneath a session-off override", async () => {
+		await expect(getEffectivePolicy("", { mode: "off" }, FAKE_CWD)).rejects.toThrow(WriteGuardConfigError);
 	});
 
 	it("CLI flag takes priority over env var when no session override", async () => {
@@ -184,6 +190,75 @@ describe("write loadProjectAllowedDirs", () => {
 
 		const result = await loadProjectAllowedDirs(tmpDir);
 		expect(result).toEqual(["./flat"]);
+	});
+
+	it("throws a configuration error when allowedDirs is empty", async () => {
+		const saved = saveEnv("PI_WRITE_GUARD_DIRS");
+		unsetEnv("PI_WRITE_GUARD_DIRS");
+		try {
+			const settings = path.join(tmpDir, ".pi", "settings.json");
+			await fs.mkdir(path.dirname(settings), { recursive: true });
+			await fs.writeFile(settings, JSON.stringify({ piWriteGuard: { allowedDirs: [] } }));
+
+			await expect(getEffectivePolicy(undefined, null, tmpDir)).rejects.toThrow(WriteGuardConfigError);
+		} finally {
+			if (saved === undefined) unsetEnv("PI_WRITE_GUARD_DIRS");
+			else setEnv("PI_WRITE_GUARD_DIRS", saved);
+		}
+	});
+
+	it("rejects an empty settings allowlist beneath a session-off override", async () => {
+		const saved = saveEnv("PI_WRITE_GUARD_DIRS");
+		unsetEnv("PI_WRITE_GUARD_DIRS");
+		try {
+			const settings = path.join(tmpDir, ".pi", "settings.json");
+			await fs.mkdir(path.dirname(settings), { recursive: true });
+			await fs.writeFile(settings, JSON.stringify({ piWriteGuard: { allowedDirs: [] } }));
+
+			await expect(getEffectivePolicy(undefined, { mode: "off" }, tmpDir)).rejects.toThrow(WriteGuardConfigError);
+		} finally {
+			if (saved === undefined) unsetEnv("PI_WRITE_GUARD_DIRS");
+			else setEnv("PI_WRITE_GUARD_DIRS", saved);
+		}
+	});
+
+	it("throws a configuration error when settings cannot be read", async () => {
+		const settings = path.join(tmpDir, ".pi", "settings.json");
+		await fs.mkdir(settings, { recursive: true });
+
+		await expect(loadProjectAllowedDirs(tmpDir)).rejects.toThrow(WriteGuardConfigError);
+	});
+
+	it("throws a configuration error for malformed settings JSON", async () => {
+		const settings = path.join(tmpDir, ".pi", "settings.json");
+		await fs.mkdir(path.dirname(settings), { recursive: true });
+		await fs.writeFile(settings, "{");
+
+		await expect(loadProjectAllowedDirs(tmpDir)).rejects.toThrow(WriteGuardConfigError);
+	});
+
+	it("throws a configuration error for a non-array allowedDirs value", async () => {
+		const settings = path.join(tmpDir, ".pi", "settings.json");
+		await fs.mkdir(path.dirname(settings), { recursive: true });
+		await fs.writeFile(settings, JSON.stringify({ piWriteGuard: { allowedDirs: "docs" } }));
+
+		await expect(loadProjectAllowedDirs(tmpDir)).rejects.toThrow(WriteGuardConfigError);
+	});
+
+	it("throws a configuration error when allowedDirs contains a non-string member", async () => {
+		const settings = path.join(tmpDir, ".pi", "settings.json");
+		await fs.mkdir(path.dirname(settings), { recursive: true });
+		await fs.writeFile(settings, JSON.stringify({ piWriteGuard: { allowedDirs: ["./docs", 1] } }));
+
+		await expect(loadProjectAllowedDirs(tmpDir)).rejects.toThrow(WriteGuardConfigError);
+	});
+
+	it("throws a configuration error when an explicit list filters to empty", async () => {
+		const settings = path.join(tmpDir, ".pi", "settings.json");
+		await fs.mkdir(path.dirname(settings), { recursive: true });
+		await fs.writeFile(settings, JSON.stringify({ piWriteGuard: { allowedDirs: [1, false] } }));
+
+		await expect(loadProjectAllowedDirs(tmpDir)).rejects.toThrow(WriteGuardConfigError);
 	});
 
 	it("returns null when no config keys present", async () => {

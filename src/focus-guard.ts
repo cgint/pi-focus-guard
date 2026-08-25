@@ -6,6 +6,9 @@ import {
   parseDirsArgList,
   resolveAllowedDirs,
   formatResolvedList,
+  requireNonEmptyDirs,
+  WriteGuardConfigError,
+  type EffectivePolicy as WriteEffectivePolicy,
   type SessionOverride,
 } from "./write/config.js";
 import { canonicalizeTargetPath, isPathInside, realpathIfExists, resolveMaybeRelative } from "./write/path-utils.js";
@@ -40,11 +43,12 @@ const DISCUSS_MODE_SYMBOLS: Record<DiscussMode, string> = {
 const COMMIT_GUARD_SYMBOL_OFF = "📝";
 const COMMIT_GUARD_SYMBOL_ON = "🚫";
 
-const POLICY_INTRO =
-  "The user has restricted write operations to specific directories.";
+function policyIntro(source: string): string {
+  return `This is a boundary the user set, not a technical failure — and not one to route around. A different tool, a shell redirect or a temp path defeat it rather than solve anything. Writes are scoped to specific directories (set via: ${source}).`;
+}
 const POLICY_ALLOWLIST_LABEL = "Writes must stay under these directories:";
 const POLICY_CLOSE =
-  "If this restriction blocks the intended work, ask the user to update the write guard.";
+  "If the work needs a path outside these, say what you were about to write and why it belongs there — that gives the user something to decide on, more than a request to widen the guard does.";
 
 export const READ_MODE_ALLOWED_TOOLS = new Set([
   "read",
@@ -61,17 +65,15 @@ export const READ_MODE_ALLOWED_DISPLAY =
   "bash(read-only), " + Array.from(READ_MODE_ALLOWED_TOOLS).join(", ");
 
 let writeSessionOverride: SessionOverride | null = null;
+let activeWritePolicy: WriteEffectivePolicy | null = null;
 let activeDiscussMode: ActiveMode = { mode: "off", explicit: false };
 let commitGuardEnabled = false;
 
-function buildDenyReason(detail: string, allowedDirs: string[]): string {
-  const allowlist =
-    allowedDirs.length > 0
-      ? allowedDirs.map((d) => `  ${d}`).join("\n")
-      : "  (none)";
+function buildDenyReason(detail: string, allowedDirs: string[], source: string): string {
+  const allowlist = allowedDirs.map((d) => `  ${d}`).join("\n");
   return (
-    `DENIED: ${detail}\n\n` +
-    `${POLICY_INTRO}\n\n` +
+    `[WRITE DENIED — OUT OF SCOPE]\n${detail}\n\n` +
+    `${policyIntro(source)}\n\n` +
     `${POLICY_ALLOWLIST_LABEL}\n` +
     `${allowlist}\n\n` +
     `${POLICY_CLOSE}`
@@ -149,6 +151,17 @@ export default function focusGuard(pi: ExtensionAPI) {
     pi.appendEntry(WRITE_PERSIST_TYPE, writeSessionOverride);
   }
 
+  async function reportWriteGuardConfigError(error: unknown, ctx: ExtensionContext, shutdown = false): Promise<boolean> {
+    if (!(error instanceof WriteGuardConfigError)) return false;
+    if (ctx.hasUI) ctx.ui.notify(error.message, "error");
+    await pi.sendMessage(
+      { customType: WRITE_PERSIST_TYPE, content: error.message, display: true },
+      { triggerTurn: false },
+    );
+    if (shutdown) ctx.shutdown();
+    return true;
+  }
+
   function persistDiscussOverride(): void {
     if (activeDiscussMode.mode === "off") return;
     pi.appendEntry(DISCUSS_PERSIST_TYPE, activeDiscussMode);
@@ -159,8 +172,8 @@ export default function focusGuard(pi: ExtensionAPI) {
   }
 
   async function updateWriteStatus(ctx: ExtensionContext): Promise<void> {
-    if (!ctx.hasUI) return;
-    const policy = await getWriteEffectivePolicy(pi.getFlag("write-guard"), writeSessionOverride, ctx.cwd);
+    if (!ctx.hasUI || !activeWritePolicy) return;
+    const policy = activeWritePolicy;
     if (!policy.enforce) {
       ctx.ui.setStatus?.(WRITE_STATUS_KEY, GUARD_SYMBOL_OFF);
       return;
@@ -237,8 +250,8 @@ export default function focusGuard(pi: ExtensionAPI) {
       const argsTrimmed = (args ?? "").trim();
 
       if (!argsTrimmed) {
-        if (!ctx.hasUI) return;
-        const policy = await getWriteEffectivePolicy(pi.getFlag("write-guard"), writeSessionOverride, ctx.cwd);
+        if (!ctx.hasUI || !activeWritePolicy) return;
+        const policy = activeWritePolicy;
         if (!policy.enforce) {
           ctx.ui.notify(`Write guard is not enforcing (source: ${policy.source}).`, "info");
           return;
@@ -251,6 +264,7 @@ export default function focusGuard(pi: ExtensionAPI) {
       const lower = argsTrimmed.toLowerCase();
       if (lower === "all") {
         writeSessionOverride = { mode: "off" };
+        activeWritePolicy = { enforce: false, source: "session(off)", dirs: null };
         persistWriteOverride();
         await updateWriteStatus(ctx);
         if (ctx.hasUI) {
@@ -263,7 +277,13 @@ export default function focusGuard(pi: ExtensionAPI) {
         return;
       }
       const dirs = parseDirsArgList(argsTrimmed);
-      writeSessionOverride = { mode: "allow", dirs };
+      try {
+        writeSessionOverride = { mode: "allow", dirs: requireNonEmptyDirs(dirs, "command") };
+        activeWritePolicy = { enforce: true, source: "session", dirs: writeSessionOverride.dirs };
+      } catch (error) {
+        if (await reportWriteGuardConfigError(error, ctx)) return;
+        throw error;
+      }
       persistWriteOverride();
       await updateWriteStatus(ctx);
       if (ctx.hasUI) {
@@ -282,6 +302,7 @@ export default function focusGuard(pi: ExtensionAPI) {
     description: "Disable write restrictions (same as /focus-write-guard all)",
     handler: async (_args, ctx) => {
       writeSessionOverride = { mode: "off" };
+      activeWritePolicy = { enforce: false, source: "session(off)", dirs: null };
       persistWriteOverride();
       await updateWriteStatus(ctx);
       if (ctx.hasUI) {
@@ -425,6 +446,8 @@ export default function focusGuard(pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     deferredFollowUps.length = 0;
+    activeWritePolicy = null;
+    writeSessionOverride = null;
     const entries = ctx.sessionManager.getEntries();
 
     const lastWrite = entries
@@ -432,19 +455,12 @@ export default function focusGuard(pi: ExtensionAPI) {
       .pop() as { data?: SessionOverride } | undefined;
     if (lastWrite?.data) {
       writeSessionOverride = lastWrite.data;
-      if (ctx.hasUI && lastWrite.data.mode === "allow") {
-        const resolved = await resolveAllowedDirs(lastWrite.data.dirs, ctx.cwd);
-        const list = formatResolvedList(resolved);
-        await pi.sendMessage(
-          { customType: WRITE_PERSIST_TYPE, content: `Write guard set for this session.\nAllowed under:\n${list}\n\nTreat denied writes as policy boundaries, not technical failures to route around.`, display: true },
-          { triggerTurn: false },
-        );
-      }
     }
 
     const writeOff = pi.getFlag("write-guard-off") || pi.getFlag("write-guard-all");
     if (writeOff) {
       writeSessionOverride = { mode: "off" };
+      activeWritePolicy = { enforce: false, source: "session(off)", dirs: null };
       persistWriteOverride();
       if (ctx.hasUI) {
         await pi.sendMessage(
@@ -521,7 +537,22 @@ export default function focusGuard(pi: ExtensionAPI) {
     }
 
     updateDiscussStatus(ctx, activeDiscussMode.mode);
-    await updateWriteStatus(ctx);
+    try {
+      activeWritePolicy = await getWriteEffectivePolicy(pi.getFlag("write-guard"), writeSessionOverride, ctx.cwd);
+      await updateWriteStatus(ctx);
+    } catch (error) {
+      activeWritePolicy = null;
+      if (!(await reportWriteGuardConfigError(error, ctx, true))) throw error;
+      return;
+    }
+    if (ctx.hasUI && lastWrite?.data?.mode === "allow" && activeWritePolicy.enforce && activeWritePolicy.source === "session") {
+      const resolved = await resolveAllowedDirs(activeWritePolicy.dirs, ctx.cwd);
+      const list = formatResolvedList(resolved);
+      await pi.sendMessage(
+        { customType: WRITE_PERSIST_TYPE, content: `Write guard set for this session.\nAllowed under:\n${list}\n\nTreat denied writes as policy boundaries, not technical failures to route around.`, display: true },
+        { triggerTurn: false },
+      );
+    }
     updateCommitStatus(ctx);
   });
 
@@ -550,7 +581,8 @@ export default function focusGuard(pi: ExtensionAPI) {
 
     if (!["write", "edit", "bash"].includes(event.toolName)) return undefined;
 
-    const policy = await getWriteEffectivePolicy(pi.getFlag("write-guard"), writeSessionOverride, ctx.cwd);
+    const policy = activeWritePolicy;
+    if (!policy) return { block: true, reason: "Write guard policy was not activated; start or reload the session before writing." };
     if (!policy.enforce) return undefined;
 
     if (event.toolName === "write" || event.toolName === "edit") {
@@ -568,6 +600,7 @@ export default function focusGuard(pi: ExtensionAPI) {
       const reason = buildDenyReason(
         `Write operation to '${targetPathRaw}' is outside the allowed directories.`,
         resolvedAllowed,
+        policy.source,
       );
       return { block: true, reason };
     }
@@ -583,14 +616,14 @@ export default function focusGuard(pi: ExtensionAPI) {
     try {
       ast = parse(command);
     } catch (err) {
-      return { block: true, reason: `Bash parse error: ${err instanceof Error ? err.message : String(err)}. Command blocked for safety.` };
+      return { block: true, reason: `Bash parse error: ${err instanceof Error ? err.message : String(err)}. The command was not run because of a parser limitation, not a policy decision; rephrase the command and retry.` };
     }
 
     let findings: WriteFinding[];
     try {
       findings = extractWriteTargets(ast);
     } catch (err) {
-      return { block: true, reason: `AST analysis error: ${err instanceof Error ? err.message : String(err)}. Command blocked for safety.` };
+      return { block: true, reason: `AST analysis error: ${err instanceof Error ? err.message : String(err)}. The command was not run because of an analysis limitation, not a policy decision; rephrase the command and retry.` };
     }
 
     if (findings.length === 0) return undefined;
@@ -618,6 +651,7 @@ export default function focusGuard(pi: ExtensionAPI) {
       const reason = buildDenyReason(
         `The bash command writes to:\n${blockedList}`,
         resolvedAllowed,
+        policy.source,
       );
       return { block: true, reason };
     }

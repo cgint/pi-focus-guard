@@ -62,7 +62,13 @@ Startup flags can set the initial mode:
 --commit-guard-off
 ```
 
-Explicit `off` flags override persisted state for their guard.
+Explicit `off` flags override persisted state for their guard after all explicitly configured write allowlists have been validated; an invalid lower-priority source is still an activation error.
+
+### Write-guard configuration failures and reload
+
+An explicitly configured write allowlist must contain at least one directory. Empty `--write-guard` or `PI_WRITE_GUARD_DIRS`, an empty persisted allowlist, and an explicitly present empty `allowedDirs` list in `.pi/settings.json` fail at session activation rather than waiting for a write attempt. Every explicit source is validated even when a valid or `off` higher-priority source would otherwise select the active policy. Malformed or unreadable settings (other than a missing settings file), a non-array `allowedDirs`, and any non-string member are also configuration errors. Pi reports the source and calls `ctx.shutdown()` so interactive and RPC sessions close when idle. Pi documents `ctx.shutdown()` as a no-op in print mode; print invocations instead finish normally after their prompts.
+
+A missing `.pi/settings.json` or an absent supported allowlist key means the write guard is unconfigured. The active policy is validated at `session_start` and on `/focus-write-guard` transitions; tool calls use that in-memory policy and do not reread configuration. Edit settings and use `/reload`, or start/resume/fork a session, to activate settings changes.
 
 Discuss mode can also be changed inline while submitting a request:
 

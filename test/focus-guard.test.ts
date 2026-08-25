@@ -46,6 +46,7 @@ function createCtx(overrides: Partial<any> = {}) {
     sessionManager: {
       getEntries: vi.fn().mockReturnValue([]),
     },
+    shutdown: vi.fn(),
     ...overrides,
   };
 }
@@ -104,6 +105,73 @@ describe("startup flags", () => {
     await pi._callbacks.session_start[0]({}, ctx);
     return ctx;
   }
+
+  it("reports an invalid empty --write-guard value at startup and shuts down", async () => {
+    pi._setFlag("write-guard", "");
+    const ctx = await sessionStart();
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      "Write guard configuration is invalid: --write-guard must name at least one directory. Give at least one directory, or use read-only discuss mode if you intend to forbid all writes.",
+      "error",
+    );
+    expect(ctx.shutdown).toHaveBeenCalledOnce();
+  });
+
+  it("shuts down when a persisted allowlist is empty", async () => {
+    const ctx = await sessionStart(createCtx({
+      sessionManager: {
+        getEntries: vi.fn().mockReturnValue([
+          { type: "custom", customType: "write-guard", data: { mode: "allow", dirs: [] } },
+        ]),
+      },
+    }));
+
+    expect(ctx.shutdown).toHaveBeenCalledOnce();
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("the session override"), "error");
+    expect(pi._messages.some((message: any) => message.msg.content.includes("Allowed under:"))).toBe(false);
+  });
+
+  it("clears a previously active policy when a later startup fails", async () => {
+    pi._setFlag("write-guard", "docs");
+    await sessionStart();
+    pi._setFlag("write-guard", "");
+    const failedCtx = await sessionStart();
+
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "write", input: { path: "./docs/file.txt", content: "data" } },
+      failedCtx,
+    );
+    expect(failedCtx.shutdown).toHaveBeenCalledOnce();
+    expect(result).toEqual(expect.objectContaining({ block: true, reason: expect.stringContaining("not activated") }));
+  });
+
+  it("shows the activated policy without rereading a mutated source", async () => {
+    pi._setFlag("write-guard", "docs");
+    await sessionStart();
+    pi._setFlag("write-guard", "");
+    const ctx = await invoke(pi, "focus-write-guard", "", createCtx());
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("source: flag"), "info");
+    expect(ctx.ui.notify).not.toHaveBeenCalledWith(expect.stringContaining("invalid"), "error");
+    await expect(pi._callbacks.tool_call[0](
+      { toolName: "write", input: { path: "/outside/file.txt", content: "data" } },
+      ctx,
+    )).resolves.toEqual(expect.objectContaining({ block: true }));
+  });
+
+  it("uses the policy activated at session start rather than rereading settings on tool calls", async () => {
+    await invoke(pi, "focus-write-guard-all", "", createCtx({ hasUI: false }));
+    const ctx = await sessionStart();
+    pi._setFlag("write-guard", "");
+
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "write", input: { path: "/project/file.txt", content: "data" } },
+      ctx,
+    );
+
+    expect(result).toBeUndefined();
+    expect(ctx.shutdown).not.toHaveBeenCalled();
+  });
 
   it("starts discuss mode off with --dm-off even when a persisted mode exists", async () => {
     pi._setFlag("dm-off", true);
@@ -227,6 +295,20 @@ describe("write guard parity", () => {
     expect(pi.appendEntry).toHaveBeenCalledWith("write-guard", { mode: "allow", dirs: ["docs"] });
     const ctx = await invoke(pi, "focus-write-guard", "docs", createCtx({ cwd: "/project" }));
     expect(ctx.ui.setStatus).toHaveBeenCalledWith("a2_write_guard", expect.any(String));
+  });
+
+  it("rejects an empty command allowlist without changing the existing policy", async () => {
+    const ctx = await invoke(pi, "focus-write-guard", ",", createCtx({ cwd: "/project" }));
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      "Write guard configuration is invalid: /focus-write-guard must name at least one directory. Give at least one directory, or use read-only discuss mode if you intend to forbid all writes.",
+      "error",
+    );
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "write", input: { path: "./docs/file.txt", content: "data" } },
+      createCtx({ cwd: "/project" }),
+    );
+    expect(result).toBeUndefined();
   });
 });
 
