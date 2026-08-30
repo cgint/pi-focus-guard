@@ -54,7 +54,7 @@ Precedence: explicit `off` flags override enabled/read/block flags and persisted
 | Edit tool | Block edits outside the effective allowlist exactly like `pi-write-guard`. | `write guard parity > blocks edit tool targets outside the allowlist` |
 | Bash writes | Detect and block write-capable bash targets outside the allowlist exactly like `pi-write-guard`. | `write guard parity > blocks bash write targets outside the allowlist` |
 | Discuss block | Block all tool calls exactly like `pi-discuss-mode`. | `discuss mode parity > blocks all tool calls in block mode` |
-| Discuss read | Allow read/investigation tools and read-only bash exactly like `pi-discuss-mode`; block write/action tools. | `discuss mode parity > allows read tool calls in read mode`; `allows read-only bash in read mode`; `blocks write-like bash in read mode` |
+| Discuss read | Block `write` and `edit`; allow read-only bash and every other tool, including session-local and extension tools. | `discuss mode parity > allows read, session-local, and extension tool calls in read mode`; `allows read-only bash in read mode`; `blocks write and edit tool calls in read mode`; `blocks write-like bash in read mode` |
 | Commit guard on | Block bash commands containing `git commit` with a collaborative-review message. | `commit guard > blocks bash commands containing git commit when enabled` |
 | Commit guard off | Do not block bash commands solely because they contain `git commit`. | `commit guard > allows bash commands containing git commit when disabled` |
 | Write persistence/status | Write guard session override is persisted and footer status updates. | `write guard parity > persists write guard allowlist and updates status` |

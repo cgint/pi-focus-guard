@@ -95,7 +95,7 @@ That means:
 
 - Write allowlist behavior should match `pi-write-guard`.
 - Bash write detection should match `pi-write-guard`.
-- Discuss block/read/off behavior should match `pi-discuss-mode`.
+- Discuss block/off behavior should match `pi-discuss-mode`; read mode intentionally diverges as documented above by permitting non-`write`/`edit` tools and read-only `bash`.
 - Read-only bash classification should match `pi-discuss-mode`.
 - Existing denial-message intent should remain cooperative: denied actions are policy boundaries, not technical failures to route around.
 
@@ -124,12 +124,12 @@ This guard is not a security boundary. It is a collaboration signal that prevent
 - `pi-write-guard`
 - `pi-discuss-mode`
 
-Those older extensions can be deprecated later after parity is verified.
+Those older extensions can be deprecated later after retained behavior is verified and intentional divergences are documented.
 
 ## Non-goals for the initial port
 
 - Do not redesign write-guard policy semantics.
-- Do not redesign discuss-mode policy semantics.
+- Preserve legacy discuss block-mode and persistence semantics. Discuss read mode intentionally diverges from the legacy curated allowlist: it blocks only `write` and `edit`, requires `bash` commands to be read-only, and permits every other tool name, including session-local and extension tools.
 - Do not silently add new config precedence rules; startup flag precedence is explicit: off flags override on/read/block flags and persisted state for that guard.
 - Inline discuss directives change the current session mode without changing the existing persistence semantics.
 - Do not keep legacy command names unless explicitly chosen later.
@@ -137,15 +137,15 @@ Those older extensions can be deprecated later after parity is verified.
 
 ## Verification expectations
 
-Before treating this successor as ready, tests should show parity for:
+Before treating this successor as ready, tests should show parity for retained behavior and prove documented divergences:
 
 - focus-prefixed command registration;
 - startup flag registration and initial-mode behavior;
 - write/edit path allowlist blocking;
 - bash write detection;
 - discuss block mode;
-- discuss read mode;
-- read-only bash allowance;
+- discuss read mode blocks `write` and `edit` while allowing all other non-bash tools, including extension tools;
+- read-only bash allowance and write-like bash blocking;
 - `/focus-commit-guard` printing commit guard status;
 - commit guard blocking `git commit` while enabled;
 - commit guard allowing non-commit bash when enabled;

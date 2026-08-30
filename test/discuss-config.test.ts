@@ -3,8 +3,6 @@ import { getEffectivePolicy, type EffectivePolicy } from "../src/discuss/config.
 import {
   formatDiscussBlockedToolReason as formatBlockedToolReason,
   isToolAllowedByDiscussPolicy as isToolAllowedByPolicy,
-  READ_MODE_ALLOWED_TOOLS,
-  READ_MODE_ALLOWED_DISPLAY,
 } from "../src/focus-guard.js";
 import { isBashCommandReadOnly } from "../src/discuss/is-readonly.js";
 
@@ -41,23 +39,6 @@ describe("discuss getEffectivePolicy", () => {
 });
 
 describe("discuss isToolAllowedByPolicy", () => {
-  const EXPECTED_READ_MODE_ALLOWED = new Set([
-    "read",
-    "ls",
-    "find",
-    "grep",
-    "advisor",
-    "web_search",
-    "fetch_content",
-    "get_search_content",
-  ]);
-
-  it("READ_MODE_ALLOWED_TOOLS matches the expected canonical set", () => {
-    expect(READ_MODE_ALLOWED_TOOLS.size).toBe(EXPECTED_READ_MODE_ALLOWED.size);
-    for (const tool of EXPECTED_READ_MODE_ALLOWED) {
-      expect(READ_MODE_ALLOWED_TOOLS.has(tool)).toBe(true);
-    }
-  });
 
   it("allows all tools when policy is off", () => {
     expect(isToolAllowedByPolicy("bash", { enforce: false, mode: "off" })).toBe(true);
@@ -72,47 +53,29 @@ describe("discuss isToolAllowedByPolicy", () => {
     expect(isToolAllowedByPolicy("write", { enforce: true, mode: "block" })).toBe(false);
   });
 
-  it("allows ls, find, grep built-in tools in read mode", () => {
+  it("allows all tools except write, edit, and bash in read mode", () => {
     const readMode: EffectivePolicy = { enforce: true, mode: "read" };
-    expect(isToolAllowedByPolicy("ls", readMode)).toBe(true);
-    expect(isToolAllowedByPolicy("find", readMode)).toBe(true);
-    expect(isToolAllowedByPolicy("grep", readMode)).toBe(true);
-  });
-
-  it("allows only the expected read-mode tools and blocks write-capable ones", () => {
-    const readMode: EffectivePolicy = { enforce: true, mode: "read" };
-    for (const tool of EXPECTED_READ_MODE_ALLOWED) {
-      expect(isToolAllowedByPolicy(tool, readMode)).toBe(true);
-    }
+    expect(isToolAllowedByPolicy("read", readMode)).toBe(true);
+    expect(isToolAllowedByPolicy("workpad", readMode)).toBe(true);
+    expect(isToolAllowedByPolicy("arbitrary-extension-tool", readMode)).toBe(true);
     expect(isToolAllowedByPolicy("bash", readMode)).toBe(false);
     expect(isToolAllowedByPolicy("edit", readMode)).toBe(false);
     expect(isToolAllowedByPolicy("write", readMode)).toBe(false);
   });
 });
 
-describe("discuss READ_MODE_ALLOWED_DISPLAY", () => {
-  it("includes bash(read-only) for the special-cased bash handler", () => {
-    expect(READ_MODE_ALLOWED_DISPLAY).toContain("bash(read-only)");
-  });
-
-  it("includes all tools from READ_MODE_ALLOWED_TOOLS", () => {
-    for (const tool of READ_MODE_ALLOWED_TOOLS) {
-      expect(READ_MODE_ALLOWED_DISPLAY).toContain(tool);
-    }
-  });
-});
-
 describe("discuss formatBlockedToolReason", () => {
-  it("includes HARD BLOCK prefix", () => {
+  it("identifies a read-mode denial", () => {
     const reason = formatBlockedToolReason("bash", { enforce: true, mode: "read" });
-    expect(reason).toContain("[TOOL CALL DENIED — HARD BLOCK]");
+    expect(reason).toContain("[TOOL CALL DENIED — READ-ONLY DISCUSS]");
   });
 
-  it("contains the discuss-mode explanation", () => {
+  it("explains read-mode restrictions without listing allowed tools", () => {
     const reason = formatBlockedToolReason("bash", { enforce: true, mode: "read" });
     expect(reason).toContain("discuss mode");
-    expect(reason).toContain("think, analyze, and discuss");
-    expect(reason).toContain("not take action");
+    expect(reason).toContain("Write and edit calls are blocked");
+    expect(reason).toContain("bash commands must be read-only");
+    expect(reason).not.toContain("Allowed tools:");
   });
 
   it("contains the user-action hint", () => {

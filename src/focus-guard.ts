@@ -50,19 +50,6 @@ const POLICY_ALLOWLIST_LABEL = "Writes must stay under these directories:";
 const POLICY_CLOSE =
   "If the work needs a path outside these, say what you were about to write and why it belongs there — that gives the user something to decide on, more than a request to widen the guard does.";
 
-export const READ_MODE_ALLOWED_TOOLS = new Set([
-  "read",
-  "ls",
-  "find",
-  "grep",
-  "advisor",
-  "web_search",
-  "fetch_content",
-  "get_search_content",
-]);
-
-export const READ_MODE_ALLOWED_DISPLAY =
-  "bash(read-only), " + Array.from(READ_MODE_ALLOWED_TOOLS).join(", ");
 
 let writeSessionOverride: SessionOverride | null = null;
 let activeWritePolicy: WriteEffectivePolicy | null = null;
@@ -83,11 +70,14 @@ function buildDenyReason(detail: string, allowedDirs: string[], source: string):
 export function isToolAllowedByDiscussPolicy(toolName: string, policy: DiscussEffectivePolicy): boolean {
   if (!policy.enforce) return true;
   if (policy.mode === "block") return false;
-  return READ_MODE_ALLOWED_TOOLS.has(toolName);
+  return !["write", "edit", "bash"].includes(toolName);
 }
 
 export function formatDiscussBlockedToolReason(_toolName: string, policy: DiscussEffectivePolicy): string {
   if (!policy.enforce) return "";
+  if (policy.mode === "read") {
+    return `[TOOL CALL DENIED — READ-ONLY DISCUSS]\n\nYou are in **discuss mode**. Write and edit calls are blocked, and bash commands must be read-only. Other tools can run so you can investigate without making changes.\n\nIf you need to perform a blocked action, describe what you'd like to do and ask the user if they want to switch out of discuss mode.`;
+  }
 
   return `[TOOL CALL DENIED — HARD BLOCK]\n\nYou are in **discuss mode**. The user has chosen this mode so you can think, analyze, and discuss — not take action. No tool calls will execute.\n\nIf you need to perform actions, describe what you'd like to do and ask the user if they want to switch out of discuss mode.`;
 }
@@ -202,7 +192,7 @@ export default function focusGuard(pi: ExtensionAPI) {
   function discussModeMessage(mode: DiscussMode): string {
     if (mode === "off") return "Strict-Discuss mode ended by user.";
     if (mode === "block") return "Strict-Discuss mode started by user in BLOCK-mode. Let's align conceptually first. We are strictly stepping back from any tools to discuss ideas, architecture, or goals.";
-    return `Strict-Discuss mode started by user in READ-ONLY-mode. Let's investigate together first. We want to read and inspect the information at hand to build a shared understanding, but hold off on making any changes yet. Allowed tools: ${READ_MODE_ALLOWED_DISPLAY}`;
+    return "Strict-Discuss mode started by user in READ-ONLY-mode. Let's investigate together first. We want to build a shared understanding without making changes: write and edit calls are blocked, and bash commands must be read-only.";
   }
 
   async function activateDiscussMode(
@@ -219,7 +209,7 @@ export default function focusGuard(pi: ExtensionAPI) {
       } else if (mode === "block") {
         ctx.ui.notify("Discuss mode set to BLOCK for this session. All tool calls will be blocked.", "info");
       } else {
-        ctx.ui.notify(`Discuss mode set to READ-ONLY for this session. Allowed tools: ${READ_MODE_ALLOWED_DISPLAY}.`, "info");
+        ctx.ui.notify("Discuss mode set to READ-ONLY for this session. Write and edit calls are blocked; bash commands must be read-only.", "info");
       }
     }
 
@@ -328,7 +318,7 @@ export default function focusGuard(pi: ExtensionAPI) {
           return;
         }
         if (policy.mode === "read") {
-          ctx.ui.notify(`Discuss mode is READ-ONLY . Allowed tools: ${READ_MODE_ALLOWED_DISPLAY}.`, "info");
+          ctx.ui.notify("Discuss mode is READ-ONLY. Write and edit calls are blocked; bash commands must be read-only.", "info");
           return;
         }
         ctx.ui.notify(`Discuss mode is BLOCK . All tool calls are blocked.`, "info");
@@ -496,7 +486,7 @@ export default function focusGuard(pi: ExtensionAPI) {
       updateDiscussStatus(ctx, "read");
       if (ctx.hasUI) {
         await pi.sendMessage(
-          { customType: DISCUSS_PERSIST_TYPE, content: `Strict-Discuss mode started by user in READ-ONLY-mode (via --dm-read). Let's investigate together first. We want to read and inspect the information at hand to build a shared understanding, but hold off on making any changes yet. Allowed tools: ${READ_MODE_ALLOWED_DISPLAY}`, display: true },
+          { customType: DISCUSS_PERSIST_TYPE, content: "Strict-Discuss mode started by user in READ-ONLY-mode (via --dm-read). Let's investigate together first. We want to build a shared understanding without making changes: write and edit calls are blocked, and bash commands must be read-only.", display: true },
           { triggerTurn: false },
         );
       }

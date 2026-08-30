@@ -336,16 +336,18 @@ describe("discuss mode parity", () => {
     expect(result.reason).toContain("discuss mode");
   });
 
-  it("allows read tool calls in read mode", async () => {
+  it("allows read, session-local, and extension tool calls in read mode", async () => {
     await invoke(pi, "focus-discuss-read", "", createCtx());
     const toolCall = pi._callbacks.tool_call[0];
 
-    const result = await toolCall(
-      { toolName: "read", input: { path: "README.md" } },
-      createCtx(),
-    );
+    for (const toolName of ["read", "workpad", "arbitrary-extension-tool"]) {
+      const result = await toolCall(
+        { toolName, input: { path: "README.md" } },
+        createCtx(),
+      );
 
-    expect(result).toBeUndefined();
+      expect(result).toBeUndefined();
+    }
   });
 
   it("allows read-only bash in read mode", async () => {
@@ -358,6 +360,21 @@ describe("discuss mode parity", () => {
     );
 
     expect(result).toBeUndefined();
+  });
+
+  it("blocks write and edit tool calls in read mode", async () => {
+    await invoke(pi, "focus-discuss-read", "", createCtx());
+    const toolCall = pi._callbacks.tool_call[0];
+
+    for (const toolName of ["write", "edit"]) {
+      const result = await toolCall(
+        { toolName, input: { path: "README.md" } },
+        createCtx(),
+      );
+
+      expect(result).toEqual(expect.objectContaining({ block: true }));
+      expect(result.reason).toContain("READ-ONLY DISCUSS");
+    }
   });
 
   it("blocks write-like bash in read mode", async () => {
