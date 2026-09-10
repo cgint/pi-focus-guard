@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import focusGuard, { COMMIT_GUARD_STATUS_KEY, formatCommitGuardBlockedReason } from "../src/focus-guard.js";
+import focusGuard, {
+  COMMIT_GUARD_STATUS_KEY,
+  formatCommitGuardBlockedReason,
+} from "../src/focus-guard.js";
 
 function createPiMock() {
   const commands = new Map<string, { description: string; handler: (args: string, ctx: any) => Promise<void> }>();
@@ -252,7 +255,10 @@ describe("write guard parity", () => {
     );
 
     expect(result).toEqual(expect.objectContaining({ block: true }));
-    expect(result.reason).toContain("DENIED");
+    expect(result.reason).toContain("[WRITE DENIED — OUTSIDE APPROVED SCOPE]");
+    expect(result.reason).toContain("Blocked action");
+    expect(result.reason).toContain("Why guarded");
+    expect(result.reason).toContain("Next step");
     expect(result.reason).toContain("outside the allowed directories");
   });
 
@@ -288,6 +294,7 @@ describe("write guard parity", () => {
     );
 
     expect(result).toEqual(expect.objectContaining({ block: true }));
+    expect(result.reason).toContain("[WRITE DENIED — OUTSIDE APPROVED SCOPE]");
     expect(result.reason).toContain("The bash command writes to");
   });
 
@@ -333,7 +340,8 @@ describe("discuss mode parity", () => {
     );
 
     expect(result).toEqual(expect.objectContaining({ block: true }));
-    expect(result.reason).toContain("discuss mode");
+    expect(result.reason).toContain("[TOOL CALL DENIED — DISCUSS BLOCK MODE]");
+    expect(result.reason).toContain("No tool calls may run.");
   });
 
   it("allows read, session-local, and extension tool calls in read mode", async () => {
@@ -373,7 +381,7 @@ describe("discuss mode parity", () => {
       );
 
       expect(result).toEqual(expect.objectContaining({ block: true }));
-      expect(result.reason).toContain("READ-ONLY DISCUSS");
+      expect(result.reason).toContain("[TOOL CALL DENIED — DISCUSS READ-ONLY MODE]");
     }
   });
 
@@ -387,13 +395,19 @@ describe("discuss mode parity", () => {
     );
 
     expect(result).toEqual(expect.objectContaining({ block: true }));
-    expect(result.reason).toContain("discuss mode");
+    expect(result.reason).toContain("[TOOL CALL DENIED — DISCUSS READ-ONLY MODE]");
+    expect(result.reason).toContain("Write and edit calls are blocked.");
+    expect(result.reason).toContain("Bash commands must be classified as read-only.");
+    expect(result.reason).toContain("All other tool calls may run.");
   });
 
-  it("persists discuss mode and updates status", async () => {
+  it("persists discuss mode, updates status, and states the strict read contract", async () => {
     const ctx = await invoke(pi, "focus-discuss-read", "", createCtx());
     expect(pi.appendEntry).toHaveBeenCalledWith("discuss-mode", { mode: "read", explicit: true });
     expect(ctx.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "📖");
+    expect(pi._messages.at(-1).msg.content).toContain("Write and edit calls are blocked.");
+    expect(pi._messages.at(-1).msg.content).toContain("Bash is permitted only when the guard classifies it as read-only.");
+    expect(pi._messages.at(-1).msg.content).not.toContain("scratch");
   });
 
   it("changes mode before processing a transformed inline request", async () => {
@@ -555,7 +569,10 @@ describe("commit guard", () => {
     );
 
     expect(result).toEqual({ block: true, reason: formatCommitGuardBlockedReason() });
-    expect(result.reason).toContain("review git diff");
+    expect(result.reason).toContain("Blocked action");
+    expect(result.reason).toContain("Why guarded");
+    expect(result.reason).toContain("Next step");
+    expect(result.reason).toContain("review `git diff` together");
   });
 
   it("allows bash commands containing git commit when disabled", async () => {

@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { getEffectivePolicy, type EffectivePolicy } from "../src/discuss/config.js";
 import {
+  formatDiscussBlockModeBlockedToolReason,
   formatDiscussBlockedToolReason as formatBlockedToolReason,
+  formatDiscussReadModeBlockedToolReason,
   isToolAllowedByDiscussPolicy as isToolAllowedByPolicy,
 } from "../src/focus-guard.js";
 import { isBashCommandReadOnly } from "../src/discuss/is-readonly.js";
@@ -64,29 +66,37 @@ describe("discuss isToolAllowedByPolicy", () => {
   });
 });
 
-describe("discuss formatBlockedToolReason", () => {
-  it("identifies a read-mode denial", () => {
-    const reason = formatBlockedToolReason("bash", { enforce: true, mode: "read" });
-    expect(reason).toContain("[TOOL CALL DENIED — READ-ONLY DISCUSS]");
-  });
+describe("discuss blocked-tool messages", () => {
+  const requiredSections = ["Blocked action", "Why guarded", "Next step"];
 
-  it("explains read-mode restrictions without listing allowed tools", () => {
-    const reason = formatBlockedToolReason("bash", { enforce: true, mode: "read" });
-    expect(reason).toContain("discuss mode");
+  it("formats read-mode denials with the truthful four-part contract", () => {
+    const reason = formatDiscussReadModeBlockedToolReason("write");
+    expect(reason).toContain("[TOOL CALL DENIED — DISCUSS READ-ONLY MODE]");
+    expect(reason).toContain("write will not execute.");
+    expect(reason).toContain("without making changes");
     expect(reason).toContain("Write and edit calls are blocked");
-    expect(reason).toContain("bash commands must be read-only");
-    expect(reason).not.toContain("Allowed tools:");
+    expect(reason).toContain("Bash commands must be classified as read-only");
+    expect(reason).toContain("All other tool calls may run");
+    for (const section of requiredSections) expect(reason).toContain(section);
   });
 
-  it("contains the user-action hint", () => {
-    const reason = formatBlockedToolReason("bash", { enforce: true, mode: "read" });
-    expect(reason).toContain("describe what you'd like to do");
-    expect(reason).toContain("switch out of discuss mode");
+  it("formats block-mode denials with the four-part contract", () => {
+    const reason = formatDiscussBlockModeBlockedToolReason("read");
+    expect(reason).toContain("[TOOL CALL DENIED — DISCUSS BLOCK MODE]");
+    expect(reason).toContain("read will not execute.");
+    expect(reason).toContain("No tool calls may run.");
+    for (const section of requiredSections) expect(reason).toContain(section);
+  });
+
+  it("selects the formatter for the active enforced mode", () => {
+    expect(formatBlockedToolReason("bash", { enforce: true, mode: "read" }))
+      .toBe(formatDiscussReadModeBlockedToolReason("bash"));
+    expect(formatBlockedToolReason("bash", { enforce: true, mode: "block" }))
+      .toBe(formatDiscussBlockModeBlockedToolReason("bash"));
   });
 
   it("returns empty string when policy is off", () => {
-    const reason = formatBlockedToolReason("bash", { enforce: false, mode: "off" });
-    expect(reason).toBe("");
+    expect(formatBlockedToolReason("bash", { enforce: false, mode: "off" })).toBe("");
   });
 });
 

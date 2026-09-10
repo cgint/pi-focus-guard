@@ -44,7 +44,7 @@ const COMMIT_GUARD_SYMBOL_OFF = "📝";
 const COMMIT_GUARD_SYMBOL_ON = "🚫";
 
 function policyIntro(source: string): string {
-  return `This is a boundary the user set, not a technical failure — and not one to route around. A different tool, a shell redirect or a temp path defeat it rather than solve anything. Writes are scoped to specific directories (set via: ${source}).`;
+  return `This is a boundary the user set, not a technical failure — and not one to route around. A different tool, a shell redirect, or a temp path defeats it rather than solving anything. Writes are scoped to specific directories (set via: ${source}).`;
 }
 const POLICY_ALLOWLIST_LABEL = "Writes must stay under these directories:";
 const POLICY_CLOSE =
@@ -59,11 +59,10 @@ let commitGuardEnabled = false;
 function buildDenyReason(detail: string, allowedDirs: string[], source: string): string {
   const allowlist = allowedDirs.map((d) => `  ${d}`).join("\n");
   return (
-    `[WRITE DENIED — OUT OF SCOPE]\n${detail}\n\n` +
-    `${policyIntro(source)}\n\n` +
-    `${POLICY_ALLOWLIST_LABEL}\n` +
-    `${allowlist}\n\n` +
-    `${POLICY_CLOSE}`
+    `[WRITE DENIED — OUTSIDE APPROVED SCOPE]\n\n` +
+    `Blocked action\n${detail}\n\n` +
+    `Why guarded\n${policyIntro(source)}\n${POLICY_ALLOWLIST_LABEL}\n${allowlist}\n\n` +
+    `Next step\n${POLICY_CLOSE}`
   );
 }
 
@@ -73,17 +72,38 @@ export function isToolAllowedByDiscussPolicy(toolName: string, policy: DiscussEf
   return !["write", "edit", "bash"].includes(toolName);
 }
 
-export function formatDiscussBlockedToolReason(_toolName: string, policy: DiscussEffectivePolicy): string {
-  if (!policy.enforce) return "";
-  if (policy.mode === "read") {
-    return `[TOOL CALL DENIED — READ-ONLY DISCUSS]\n\nYou are in **discuss mode**. Write and edit calls are blocked, and bash commands must be read-only. Other tools can run so you can investigate without making changes.\n\nIf you need to perform a blocked action, describe what you'd like to do and ask the user if they want to switch out of discuss mode.`;
-  }
+export function formatDiscussReadModeBlockedToolReason(toolName: string): string {
+  return (
+    `[TOOL CALL DENIED — DISCUSS READ-ONLY MODE]\n\n` +
+    `Blocked action\n${toolName} will not execute.\n\n` +
+    `Why guarded\nThe user chose read-only discuss mode to investigate and build shared understanding without making changes. Write and edit calls are blocked. Bash commands must be classified as read-only. All other tool calls may run.\n\n` +
+    `Next step\nContinue with allowed inspection tools, or describe the action and ask the user to switch out of discuss mode.`
+  );
+}
 
-  return `[TOOL CALL DENIED — HARD BLOCK]\n\nYou are in **discuss mode**. The user has chosen this mode so you can think, analyze, and discuss — not take action. No tool calls will execute.\n\nIf you need to perform actions, describe what you'd like to do and ask the user if they want to switch out of discuss mode.`;
+export function formatDiscussBlockModeBlockedToolReason(toolName: string): string {
+  return (
+    `[TOOL CALL DENIED — DISCUSS BLOCK MODE]\n\n` +
+    `Blocked action\n${toolName} will not execute.\n\n` +
+    `Why guarded\nThe user chose block discuss mode to align on ideas, architecture, or goals before taking action. No tool calls may run.\n\n` +
+    `Next step\nDescribe the action you would like to take and ask the user to switch out of discuss mode.`
+  );
+}
+
+export function formatDiscussBlockedToolReason(toolName: string, policy: DiscussEffectivePolicy): string {
+  if (!policy.enforce) return "";
+  return policy.mode === "read"
+    ? formatDiscussReadModeBlockedToolReason(toolName)
+    : formatDiscussBlockModeBlockedToolReason(toolName);
 }
 
 export function formatCommitGuardBlockedReason(): string {
-  return "[COMMIT DENIED — REVIEW FIRST]\n\nCommit guard is enabled. The user intentionally does not want changes committed yet. Finish the collaborative work, review git diff together, and ask the user before creating a commit.";
+  return (
+    `[COMMIT DENIED — REVIEW FIRST]\n\n` +
+    `Blocked action\n\`git commit\` will not execute.\n\n` +
+    `Why guarded\nThe user enabled commit guard because the collaboration is still in the finishing and review phase.\n\n` +
+    `Next step\nFinish the collaborative work, review \`git diff\` together, and ask the user before creating a commit.`
+  );
 }
 
 function commandContainsGitCommit(command: string): boolean {
@@ -192,7 +212,7 @@ export default function focusGuard(pi: ExtensionAPI) {
   function discussModeMessage(mode: DiscussMode): string {
     if (mode === "off") return "Strict-Discuss mode ended by user.";
     if (mode === "block") return "Strict-Discuss mode started by user in BLOCK-mode. Let's align conceptually first. We are strictly stepping back from any tools to discuss ideas, architecture, or goals.";
-    return "Strict-Discuss mode started by user in READ-ONLY-mode. Let's investigate together first. We want to build a shared understanding without making changes: write and edit calls are blocked, and bash commands must be read-only.";
+    return "Strict-Discuss mode started by user in READ-ONLY-mode. Let's investigate together first. Write and edit calls are blocked. All other tools can help build shared understanding. Bash is permitted only when the guard classifies it as read-only.";
   }
 
   async function activateDiscussMode(
@@ -486,7 +506,7 @@ export default function focusGuard(pi: ExtensionAPI) {
       updateDiscussStatus(ctx, "read");
       if (ctx.hasUI) {
         await pi.sendMessage(
-          { customType: DISCUSS_PERSIST_TYPE, content: "Strict-Discuss mode started by user in READ-ONLY-mode (via --dm-read). Let's investigate together first. We want to build a shared understanding without making changes: write and edit calls are blocked, and bash commands must be read-only.", display: true },
+          { customType: DISCUSS_PERSIST_TYPE, content: "Strict-Discuss mode started by user in READ-ONLY-mode (via --dm-read). Let's investigate together first. Write and edit calls are blocked. All other tools can help build shared understanding. Bash is permitted only when the guard classifies it as read-only.", display: true },
           { triggerTurn: false },
         );
       }

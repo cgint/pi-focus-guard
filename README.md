@@ -96,6 +96,7 @@ That means:
 - Write allowlist behavior should match `pi-write-guard`.
 - Bash write detection should match `pi-write-guard`.
 - Discuss block/off behavior should match `pi-discuss-mode`; read mode intentionally diverges as documented above by permitting non-`write`/`edit` tools and read-only `bash`.
+- In read mode, `write` and `edit` calls are blocked and bash is allowed only when classified as read-only. Read mode does not grant a scratch-write exception.
 - Read-only bash classification should match `pi-discuss-mode`.
 - Existing denial-message intent should remain cooperative: denied actions are policy boundaries, not technical failures to route around.
 
