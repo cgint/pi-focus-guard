@@ -1,8 +1,7 @@
 import type {
-	AssignmentPrefix,
 	Command,
-	Node,
 	Redirect,
+	SyntaxNode,
 	RedirectOperator,
 	Script,
 	Word,
@@ -59,7 +58,7 @@ export function extractWriteTargets(ast: Script): WriteFinding[] {
 	const findings: WriteFinding[] = [];
 
 	// Collect redirect targets from all nodes in the AST
-	function walkRedirects(node: Node): void {
+	function walkRedirects(node: SyntaxNode): void {
 		if (!node) return;
 
 		// Check redirects on this node directly
@@ -71,16 +70,16 @@ export function extractWriteTargets(ast: Script): WriteFinding[] {
 
 		// Recurse into nested command nodes (Statement wraps Command/Pipeline/AndOr/etc.)
 		if ("command" in node && node.command && typeof node.command === "object") {
-			walkRedirects(node.command as Node);
+			walkRedirects(node.command as SyntaxNode);
 		}
 
 		if ("commands" in node && Array.isArray((node as any).commands)) {
 			for (const c of (node as any).commands) walkRedirects(c);
 		}
-		if ("body" in node && node.body) walkRedirects(node.body as Node);
-		if ("clause" in node && node.clause) walkRedirects(node.clause as Node);
-		if ("then" in node && node.then) walkRedirects(node.then as Node);
-		if ("else" in node && node.else) walkRedirects(node.else as Node);
+		if ("body" in node && node.body) walkRedirects(node.body as SyntaxNode);
+		if ("clause" in node && node.clause) walkRedirects(node.clause as SyntaxNode);
+		if ("then" in node && node.then) walkRedirects(node.then as SyntaxNode);
+		if ("else" in node && node.else) walkRedirects(node.else as SyntaxNode);
 	}
 
 	function processRedirect(redirect: Redirect): void {
@@ -94,10 +93,10 @@ export function extractWriteTargets(ast: Script): WriteFinding[] {
 		}
 	}
 
-	walkRedirects(ast as unknown as Node);
+	walkRedirects(ast as unknown as SyntaxNode);
 
 	// Collect writer command targets
-	function walkWriterCommands(node: Node): void {
+	function walkWriterCommands(node: SyntaxNode): void {
 		if (!node) return;
 
 		// Check this node directly
@@ -110,18 +109,18 @@ export function extractWriteTargets(ast: Script): WriteFinding[] {
 
 		// Recurse into nested command nodes (Statement wraps Command/Pipeline/AndOr/etc.)
 		if ("command" in node && node.command && typeof node.command === "object") {
-			walkWriterCommands(node.command as Node);
+			walkWriterCommands(node.command as SyntaxNode);
 		}
 
 		if ("commands" in node && Array.isArray((node as any).commands)) {
 			for (const c of (node as any).commands) walkWriterCommands(c);
 		}
-		if ("body" in node && node.body) walkWriterCommands(node.body as Node);
-		if ("clause" in node && node.clause) walkWriterCommands(node.clause as Node);
-		if ("then" in node && node.then) walkWriterCommands(node.then as Node);
-		if ("else" in node && node.else) walkWriterCommands(node.else as Node);
+		if ("body" in node && node.body) walkWriterCommands(node.body as SyntaxNode);
+		if ("clause" in node && node.clause) walkWriterCommands(node.clause as SyntaxNode);
+		if ("then" in node && node.then) walkWriterCommands(node.then as SyntaxNode);
+		if ("else" in node && node.else) walkWriterCommands(node.else as SyntaxNode);
 	}
-	walkWriterCommands(ast as unknown as Node);
+	walkWriterCommands(ast as unknown as SyntaxNode);
 
 	return findings;
 }
@@ -132,11 +131,11 @@ export function extractWriteTargets(ast: Script): WriteFinding[] {
 
 interface WriterCommandSpec {
 	name: string;
-	extract: (args: Word[]) => string[];
+	extract: (args: readonly Word[]) => string[];
 }
 
-function nonFlagWords(prefix: AssignmentPrefix[], suffix: Word[]): Word[] {
-	return [...suffix].filter((w) => !w.text.startsWith("-"));
+function nonFlagWords(suffix: Command["suffix"]): Word[] {
+	return suffix.filter((arg): arg is Word => arg.type === "Word" && !arg.text.startsWith("-"));
 }
 
 const WRITER_COMMANDS: WriterCommandSpec[] = [
@@ -166,6 +165,6 @@ function extractWriterCommandTargets(cmd: Command): string[] {
 	const name = cmd.name.value.toLowerCase();
 	const spec = WRITER_COMMANDS.find((s) => s.name === name);
 	if (!spec) return [];
-	const args = nonFlagWords(cmd.prefix, cmd.suffix);
+	const args = nonFlagWords(cmd.suffix);
 	return spec.extract(args);
 }
