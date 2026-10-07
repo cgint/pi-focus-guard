@@ -81,9 +81,9 @@ Please investigate what needs to be done.
 -dr:
 ```
 
-The directive is removed before the request is processed. Only one directive is allowed per message. A directive-only message changes the mode without starting an agent turn. `-do:` matches `/focus-discuss-off`: it disables discuss mode for the current session but does not persist an `off` override. Inline directives are processed for interactive and RPC input, not extension-generated messages.
+The directive is removed before the request is processed. Only one directive is allowed per message. A directive-only message changes the mode without starting an agent turn. `-do:` matches `/focus-discuss-off`: it disables discuss mode for the current session and persists an `off` override (tombstone) so that a resumed session without `--dm-*` flags starts in off mode. Inline directives are processed for interactive and RPC input, not extension-generated messages.
 
-Queued follow-up directives activate when their request begins, not when they are queued. Every effective discuss-mode transition updates enforcement and footer status, applies mode-specific persistence, and emits model-visible `[discuss-mode]` context. `off` remains a session-only override and is not persisted.
+Queued follow-up directives activate when their request begins, not when they are queued. Every effective discuss-mode transition updates enforcement and footer status, applies mode-specific persistence, and emits model-visible `[discuss-mode]` context. `off` is persisted as a tombstone when explicitly set (`--dm-off`, `/focus-discuss-off`, or `-do:`); on resume the last persisted `discuss-mode` entry wins, so an `off` tombstone restores off mode and unblocks tools.
 
 ## Scope
 

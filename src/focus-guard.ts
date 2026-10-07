@@ -173,7 +173,6 @@ export default function focusGuard(pi: ExtensionAPI) {
   }
 
   function persistDiscussOverride(): void {
-    if (activeDiscussMode.mode === "off") return;
     pi.appendEntry(DISCUSS_PERSIST_TYPE, activeDiscussMode);
   }
 

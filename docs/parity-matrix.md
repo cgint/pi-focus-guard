@@ -62,7 +62,7 @@ Precedence: explicit `off` flags override enabled/read/block flags and persisted
 | Commit guard status | `/focus-commit-guard` prints status. | `commit guard > reports status through /focus-commit-guard` |
 | Commit guard footer | Footer icon reflects enabled/disabled state. | `commit guard > enables via /focus-commit-guard-on and updates footer status` |
 | Startup flags | Startup flags set initial discuss, write, and commit guard modes with explicit off precedence. | `startup flags > ...` tests in `test/focus-guard.test.ts` |
-| Inline directives | Prefix/trailing directives transform the request, apply mode at request start (including queued follow-ups), reject duplicates, handle directive-only input, ignore extension-generated input, and emit model-visible discuss-mode context. `off` is not persisted. | `test/discuss-input-directive.test.ts`; inline input tests in `test/focus-guard.test.ts` |
+| Inline directives | Prefix/trailing directives transform the request, apply mode at request start (including queued follow-ups), reject duplicates, handle directive-only input, ignore extension-generated input, and emit model-visible discuss-mode context. `off` is persisted as a tombstone on explicit transitions. | `test/discuss-input-directive.test.ts`; inline input tests in `test/focus-guard.test.ts` |
 
 ## Helper regression coverage
 
@@ -94,7 +94,7 @@ The following helper modules were copied byte-for-byte from source at port start
 
 ![Inline discuss-mode lifecycle](./inline-discuss-lifecycle.svg)
 
-An effective mode transition keeps enforcement, footer/UI status, mode-specific persistence, and model-visible `[discuss-mode]` custom context aligned. Follow-up directives are activated at their matching user `message_start`; queued metadata is FIFO-aligned with every follow-up and discarded when the agent settles or the session shuts down. `read` and `block` persist `{ mode, explicit: true }`; `off` is session-only and is not persisted.
+An effective mode transition keeps enforcement, footer/UI status, mode-specific persistence, and model-visible `[discuss-mode]` custom context aligned. Follow-up directives are activated at their matching user `message_start`; queued metadata is FIFO-aligned with every follow-up and discarded when the agent settles or the session shuts down. `read` and `block` persist `{ mode, explicit: true }`; `off` is persisted as a tombstone when explicitly set (flag, command, or `-do:`) so that resume restores off mode; the implicit default off is not persisted.
 
 ## Explicit non-decisions
 

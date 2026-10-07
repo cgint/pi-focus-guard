@@ -189,7 +189,111 @@ describe("startup flags", () => {
     expect(ctx.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "✅");
   });
 
+  it("T1: restores off from persisted off-tombstone on session_start", async () => {
+    const ctx = await sessionStart(createCtx({
+      sessionManager: {
+        getEntries: vi.fn().mockReturnValue([
+          { type: "custom", customType: "discuss-mode", data: { mode: "read", explicit: true } },
+          { type: "custom", customType: "discuss-mode", data: { mode: "off", explicit: true } },
+        ]),
+      },
+    }));
+
+    expect(ctx.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "✅");
+  });
+
+  it("T2: restores read from last persisted read entry", async () => {
+    const ctx = await sessionStart(createCtx({
+      sessionManager: {
+        getEntries: vi.fn().mockReturnValue([
+          { type: "custom", customType: "discuss-mode", data: { mode: "read", explicit: true } },
+        ]),
+      },
+    }));
+
+    expect(ctx.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "📖");
+  });
+
+  it("T3: --dm-off flag overrides persisted read and persists off-tombstone", async () => {
+    pi._setFlag("dm-off", true);
+    const ctx = await sessionStart(createCtx({
+      sessionManager: {
+        getEntries: vi.fn().mockReturnValue([
+          { type: "custom", customType: "discuss-mode", data: { mode: "read", explicit: true } },
+        ]),
+      },
+    }));
+
+    expect(ctx.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "✅");
+    expect(pi.appendEntry).toHaveBeenCalledWith("discuss-mode", { mode: "off", explicit: true });
+  });
+
+  it("T3b: fresh --dm-off with no prior entries persists exactly one off-tombstone", async () => {
+    pi._setFlag("dm-off", true);
+    const ctx = await sessionStart(createCtx({
+      sessionManager: {
+        getEntries: vi.fn().mockReturnValue([]),
+      },
+    }));
+
+    expect(ctx.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "✅");
+    const offEntries = pi._entries.filter(
+      (e: any) => e.type === "discuss-mode" && e.data?.mode === "off",
+    );
+    expect(offEntries).toHaveLength(1);
+  });
+
+  it("T9: fresh session with no entries and no flags defaults to off without persisting", async () => {
+    const ctx = await sessionStart(createCtx({
+      sessionManager: {
+        getEntries: vi.fn().mockReturnValue([]),
+      },
+    }));
+
+    expect(ctx.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "✅");
+    const discussEntries = pi._entries.filter(
+      (e: any) => e.type === "discuss-mode",
+    );
+    expect(discussEntries).toHaveLength(0);
+  });
+
+  it("T10: end-to-end -do: persist-restore via activateDiscussMode then session_start", async () => {
+    // Phase 1: session starts with --dm-read, then user switches off in-session
+    pi._setFlag("dm-read", true);
+    await sessionStart(createCtx({
+      sessionManager: {
+        getEntries: vi.fn().mockReturnValue([]),
+      },
+    }));
+    await invoke(pi, "focus-discuss-off", "", createCtx());
+
+    // Capture what was persisted
+    const persisted = pi._entries.filter(
+      (e: any) => e.type === "discuss-mode",
+    );
+    expect(persisted.length).toBeGreaterThanOrEqual(1);
+    expect(persisted.at(-1).data).toEqual({ mode: "off", explicit: true });
+
+    // Phase 2: simulate resume - clear the flag so restore from entries takes effect
+    pi._setFlag("dm-read", false);
+    const ctx2 = await sessionStart(createCtx({
+      sessionManager: {
+        getEntries: vi.fn().mockReturnValue(persisted),
+      },
+    }));
+
+    // Restored mode should be off (last entry wins)
+    expect(ctx2.ui.setStatus).toHaveBeenCalledWith("a1_discuss", "✅");
+    const toolCall = pi._callbacks.tool_call[0];
+    const result = await toolCall(
+      { toolName: "write", input: { path: "/project/file.txt", content: "data" } },
+      ctx2,
+    );
+    expect(result).toBeUndefined();
+  });
+
   it("starts write guard off with --write-guard-off even when a persisted allowlist exists", async () => {
+    await invoke(pi, "focus-discuss-off", "", createCtx({ hasUI: false }));
     pi._setFlag("write-guard-off", true);
     await sessionStart(createCtx({
       sessionManager: {
@@ -207,6 +311,7 @@ describe("startup flags", () => {
   });
 
   it("starts commit guard on with --commit-guard", async () => {
+    await invoke(pi, "focus-discuss-off", "", createCtx({ hasUI: false }));
     pi._setFlag("commit-guard", true);
     await sessionStart();
     const result = await pi._callbacks.tool_call[0](
@@ -509,7 +614,7 @@ describe("discuss mode parity", () => {
     );
   });
 
-  it("keeps inline -do: as a non-persisted session override", async () => {
+  it("persists off-tombstone for inline -do: directive", async () => {
     const result = await pi._callbacks.input[0]({
       type: "input",
       text: "-do: implement the change",
@@ -517,7 +622,12 @@ describe("discuss mode parity", () => {
     }, createCtx());
 
     expect(result).toEqual({ action: "transform", text: "implement the change", images: undefined });
-    expect(pi.appendEntry).not.toHaveBeenCalledWith("discuss-mode", { mode: "off", explicit: true });
+    expect(pi.appendEntry).toHaveBeenCalledWith("discuss-mode", { mode: "off", explicit: true });
+  });
+
+  it("persists off-tombstone for /focus-discuss-off", async () => {
+    await invoke(pi, "focus-discuss-off", "", createCtx());
+    expect(pi.appendEntry).toHaveBeenCalledWith("discuss-mode", { mode: "off", explicit: true });
   });
 
   it("does not parse extension-generated messages", async () => {
