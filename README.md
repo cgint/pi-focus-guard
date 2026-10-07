@@ -46,6 +46,9 @@ The intended command shape is:
 /focus-commit-guard
 /focus-commit-guard-on
 /focus-commit-guard-off
+/focus-crazy-find-guard
+/focus-crazy-find-guard-on
+/focus-crazy-find-guard-off
 ```
 
 Startup flags can set the initial mode:
@@ -60,6 +63,9 @@ Startup flags can set the initial mode:
 --commit-guard
 --commit-guard-on
 --commit-guard-off
+--crazy-find-guard
+--crazy-find-guard-on
+--crazy-find-guard-off
 ```
 
 Explicit `off` flags override persisted state for their guard after all explicitly configured write allowlists have been validated; an invalid lower-priority source is still an activation error.
@@ -100,9 +106,11 @@ That means:
 - Read-only bash classification should match `pi-discuss-mode`.
 - Existing denial-message intent should remain cooperative: denied actions are policy boundaries, not technical failures to route around.
 
-### New behavior: commit guard
+### New behavior: commit guard and crazy-find guard
 
-`pi-focus-guard` adds one new guard:
+`pi-focus-guard` adds two new guards:
+
+#### Commit guard
 
 ```text
 /focus-commit-guard
@@ -112,11 +120,25 @@ That means:
 
 When enabled, bash commands containing `git commit` are blocked.
 
-The block message should explain that the user intentionally does not want commits yet, because the collaboration phase is still about finishing together, reviewing the diff, and deciding when the milestone is ready.
+The block message explains that the user intentionally does not want commits yet, because the collaboration phase is still about finishing together, reviewing the diff, and deciding when the milestone is ready.
 
 The commit guard also exposes a footer status icon, matching the style of the discuss and write guards, so the user can see at a glance whether premature commits are currently blocked: `📝` means commit guard is off, `🚫` means commit guard is on.
 
 This guard is not a security boundary. It is a collaboration signal that prevents premature commits and encourages review before finalizing work.
+
+#### Crazy-find guard
+
+```text
+/focus-crazy-find-guard
+/focus-crazy-find-guard-on
+/focus-crazy-find-guard-off
+```
+
+When enabled (default on fresh sessions), bash commands executing unrestricted filesystem sweeps rooted at `/` or the user's home directory (`~`, `$HOME`, or the user's home path) are blocked.
+
+Normal, project-scoped searches (e.g. `find .`, `find ./src`, `find ~/dev/project`, `find /tmp`) remain completely allowed. If a chained command or pipeline contains even one crazy find (e.g. `find ~/dev/concept -name "x.md"; find / -name "x.md"`), the entire bash call is blocked with clear guidance for the LLM to narrow the path or prompt the user to run `/focus-crazy-find-guard-off`.
+
+The crazy-find guard does not display a footer icon, keeping the bottom status bar clean.
 
 ## Successor plan
 

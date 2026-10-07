@@ -21,10 +21,14 @@ import {
 } from "./discuss/config.js";
 import { isBashCommandReadOnly } from "./discuss/is-readonly.js";
 import { parseDiscussInputDirective } from "./discuss/input-directive.js";
+import { detectCrazyFind } from "./find/crazy-find-detect.js";
+import { formatCrazyFindBlockedReason, formatCrazyFindParseError } from "./find/format-deny.js";
+import * as os from "node:os";
 
 const WRITE_PERSIST_TYPE = "write-guard";
 const DISCUSS_PERSIST_TYPE = "discuss-mode";
 const COMMIT_PERSIST_TYPE = "focus-commit-guard";
+const CRAZY_FIND_PERSIST_TYPE = "focus-crazy-find-guard";
 
 const WRITE_STATUS_KEY = "a2_write_guard";
 const DISCUSS_STATUS_KEY = "a1_discuss";
@@ -55,6 +59,7 @@ let writeSessionOverride: SessionOverride | null = null;
 let activeWritePolicy: WriteEffectivePolicy | null = null;
 let activeDiscussMode: ActiveMode = { mode: "off", explicit: false };
 let commitGuardEnabled = false;
+let crazyFindGuardEnabled = true; // default enabled
 
 function buildDenyReason(detail: string, allowedDirs: string[], source: string): string {
   const allowlist = allowedDirs.map((d) => `  ${d}`).join("\n");
@@ -153,6 +158,21 @@ export default function focusGuard(pi: ExtensionAPI) {
 
   pi.registerFlag("commit-guard-off", {
     description: "Start session with commit guard disabled",
+    type: "boolean",
+  });
+
+  pi.registerFlag("crazy-find-guard", {
+    description: "Start session with crazy-find guard enabled",
+    type: "boolean",
+  });
+
+  pi.registerFlag("crazy-find-guard-on", {
+    description: "Start session with crazy-find guard enabled",
+    type: "boolean",
+  });
+
+  pi.registerFlag("crazy-find-guard-off", {
+    description: "Start session with crazy-find guard disabled",
     type: "boolean",
   });
 
@@ -453,6 +473,41 @@ export default function focusGuard(pi: ExtensionAPI) {
     },
   });
 
+  pi.registerCommand("focus-crazy-find-guard", {
+    description: "Show crazy-find guard status",
+    handler: async (_args, ctx) => {
+      if (!ctx.hasUI) return;
+      ctx.ui.notify(
+        crazyFindGuardEnabled
+          ? "Crazy-find guard is ON — find / and find ~ are blocked."
+          : "Crazy-find guard is OFF — unrestricted find commands are allowed.",
+        "info",
+      );
+    },
+  });
+
+  pi.registerCommand("focus-crazy-find-guard-on", {
+    description: "Enable crazy-find guard (block find on / and ~)",
+    handler: async (_args, ctx) => {
+      crazyFindGuardEnabled = true;
+      pi.appendEntry(CRAZY_FIND_PERSIST_TYPE, { enabled: true });
+      if (ctx.hasUI) {
+        ctx.ui.notify("Crazy-find guard enabled — find / and find ~ are blocked.", "info");
+      }
+    },
+  });
+
+  pi.registerCommand("focus-crazy-find-guard-off", {
+    description: "Disable crazy-find guard (allow find on / and ~)",
+    handler: async (_args, ctx) => {
+      crazyFindGuardEnabled = false;
+      pi.appendEntry(CRAZY_FIND_PERSIST_TYPE, { enabled: false });
+      if (ctx.hasUI) {
+        ctx.ui.notify("Crazy-find guard disabled — unrestricted find commands are allowed.", "info");
+      }
+    },
+  });
+
   pi.on("session_start", async (_event, ctx) => {
     deferredFollowUps.length = 0;
     activeWritePolicy = null;
@@ -562,6 +617,25 @@ export default function focusGuard(pi: ExtensionAPI) {
         { triggerTurn: false },
       );
     }
+    // --- Crazy-find guard restoration ---
+    const cfOff = pi.getFlag("crazy-find-guard-off");
+    const cfOn = pi.getFlag("crazy-find-guard") || pi.getFlag("crazy-find-guard-on");
+    const lastCf = entries
+      .filter((e: { type: string; customType?: string }) => e.type === "custom" && e.customType === CRAZY_FIND_PERSIST_TYPE)
+      .pop() as { data?: { enabled?: boolean } } | undefined;
+    if (cfOff) {
+      crazyFindGuardEnabled = false;
+      pi.appendEntry(CRAZY_FIND_PERSIST_TYPE, { enabled: false });
+    } else if (cfOn) {
+      crazyFindGuardEnabled = true;
+      pi.appendEntry(CRAZY_FIND_PERSIST_TYPE, { enabled: true });
+    } else if (lastCf?.data) {
+      crazyFindGuardEnabled = lastCf.data.enabled === true;
+      // Do NOT persist on default-fresh (no lastCf)
+    } else {
+      crazyFindGuardEnabled = true; // default ON, do NOT persist
+    }
+
     updateCommitStatus(ctx);
   });
 
@@ -585,6 +659,24 @@ export default function focusGuard(pi: ExtensionAPI) {
       const rawCommand = (event.input as { command?: unknown }).command;
       if (typeof rawCommand === "string" && commandContainsGitCommit(rawCommand)) {
         return { block: true, reason: formatCommitGuardBlockedReason() };
+      }
+    }
+
+    if (crazyFindGuardEnabled && event.toolName === "bash") {
+      const rawCommand = (event.input as { command?: unknown }).command;
+      if (typeof rawCommand === "string") {
+        const trimmed = rawCommand.trim();
+        if (trimmed && trimmed.includes("find")) {
+          try {
+            const findings = detectCrazyFind(trimmed, ctx.cwd, os.homedir());
+            if (findings.length > 0) {
+              return { block: true, reason: formatCrazyFindBlockedReason(findings) };
+            }
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return { block: true, reason: formatCrazyFindParseError(msg) };
+          }
+        }
       }
     }
 

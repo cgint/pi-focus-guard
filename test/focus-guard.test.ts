@@ -74,6 +74,9 @@ describe("focus command surface", () => {
       "focus-commit-guard",
       "focus-commit-guard-off",
       "focus-commit-guard-on",
+      "focus-crazy-find-guard",
+      "focus-crazy-find-guard-off",
+      "focus-crazy-find-guard-on",
       "focus-discuss",
       "focus-discuss-block",
       "focus-discuss-off",
@@ -93,6 +96,9 @@ describe("focus command surface", () => {
     expect(pi.registerFlag).toHaveBeenCalledWith("commit-guard", expect.objectContaining({ type: "boolean" }));
     expect(pi.registerFlag).toHaveBeenCalledWith("commit-guard-on", expect.objectContaining({ type: "boolean" }));
     expect(pi.registerFlag).toHaveBeenCalledWith("commit-guard-off", expect.objectContaining({ type: "boolean" }));
+    expect(pi.registerFlag).toHaveBeenCalledWith("crazy-find-guard", expect.objectContaining({ type: "boolean" }));
+    expect(pi.registerFlag).toHaveBeenCalledWith("crazy-find-guard-on", expect.objectContaining({ type: "boolean" }));
+    expect(pi.registerFlag).toHaveBeenCalledWith("crazy-find-guard-off", expect.objectContaining({ type: "boolean" }));
   });
 });
 
@@ -705,6 +711,198 @@ describe("commit guard", () => {
       createCtx(),
     );
 
+    expect(result).toBeUndefined();
+  });
+});
+
+describe("crazy-find guard", () => {
+  let pi: any;
+
+  beforeEach(async () => {
+    pi = createPiMock();
+    focusGuard(pi);
+    await invoke(pi, "focus-discuss-off", "", createCtx({ hasUI: false }));
+    await invoke(pi, "focus-write-guard-all", "", createCtx({ hasUI: false }));
+    await invoke(pi, "focus-commit-guard-off", "", createCtx({ hasUI: false }));
+  });
+
+  it("is ON by default on a fresh start and blocks find / but allows find ./src", async () => {
+    await pi._callbacks.session_start[0]({}, createCtx());
+    const toolCall = pi._callbacks.tool_call[0];
+
+    const blocked = await toolCall(
+      { toolName: "bash", input: { command: "find / -name x" } },
+      createCtx(),
+    );
+    expect(blocked).toEqual(expect.objectContaining({ block: true }));
+    expect(blocked.reason).toContain("[BASH DENIED — CRAZY FIND GUARD]");
+
+    const allowed = await toolCall(
+      { toolName: "bash", input: { command: "find ./src -name x" } },
+      createCtx(),
+    );
+    expect(allowed).toBeUndefined();
+  });
+
+  it("/focus-crazy-find-guard-off disables the guard and allows find /", async () => {
+    await invoke(pi, "focus-crazy-find-guard-off");
+    expect(pi.appendEntry).toHaveBeenCalledWith("focus-crazy-find-guard", { enabled: false });
+
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "bash", input: { command: "find / -name x" } },
+      createCtx(),
+    );
+    expect(result).toBeUndefined();
+  });
+
+  it("/focus-crazy-find-guard-on re-enables the guard and blocks find /", async () => {
+    await invoke(pi, "focus-crazy-find-guard-off", "", createCtx({ hasUI: false }));
+    await invoke(pi, "focus-crazy-find-guard-on");
+    expect(pi.appendEntry).toHaveBeenCalledWith("focus-crazy-find-guard", { enabled: true });
+
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "bash", input: { command: "find / -name x" } },
+      createCtx(),
+    );
+    expect(result).toEqual(expect.objectContaining({ block: true }));
+    expect(result.reason).toContain("[BASH DENIED — CRAZY FIND GUARD]");
+  });
+
+  it("/focus-crazy-find-guard reports status via notify", async () => {
+    await invoke(pi, "focus-crazy-find-guard-on");
+    const ctx = await invoke(pi, "focus-crazy-find-guard");
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("ON"), "info");
+
+    await invoke(pi, "focus-crazy-find-guard-off");
+    const ctx2 = await invoke(pi, "focus-crazy-find-guard");
+    expect(ctx2.ui.notify).toHaveBeenCalledWith(expect.stringContaining("OFF"), "info");
+  });
+
+  it("starts disabled with --crazy-find-guard-off even when persisted enabled", async () => {
+    pi._setFlag("crazy-find-guard-off", true);
+    await pi._callbacks.session_start[0](
+      {},
+      createCtx({
+        sessionManager: {
+          getEntries: vi.fn().mockReturnValue([
+            { type: "custom", customType: "focus-crazy-find-guard", data: { enabled: true } },
+          ]),
+        },
+      }),
+    );
+    expect(pi.appendEntry).toHaveBeenCalledWith("focus-crazy-find-guard", { enabled: false });
+
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "bash", input: { command: "find / -name x" } },
+      createCtx(),
+    );
+    expect(result).toBeUndefined();
+  });
+
+  it("starts enabled with --crazy-find-guard", async () => {
+    pi._setFlag("crazy-find-guard", true);
+    await pi._callbacks.session_start[0](
+      {},
+      createCtx({
+        sessionManager: {
+          getEntries: vi.fn().mockReturnValue([
+            { type: "custom", customType: "focus-crazy-find-guard", data: { enabled: false } },
+          ]),
+        },
+      }),
+    );
+    expect(pi.appendEntry).toHaveBeenCalledWith("focus-crazy-find-guard", { enabled: true });
+
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "bash", input: { command: "find / -name x" } },
+      createCtx(),
+    );
+    expect(result).toEqual(expect.objectContaining({ block: true }));
+  });
+
+  it("starts enabled with --crazy-find-guard-on", async () => {
+    pi._setFlag("crazy-find-guard-on", true);
+    await pi._callbacks.session_start[0]({}, createCtx());
+    expect(pi.appendEntry).toHaveBeenCalledWith("focus-crazy-find-guard", { enabled: true });
+  });
+
+  it("restores persisted disabled state on session_start with no flags", async () => {
+    await pi._callbacks.session_start[0](
+      {},
+      createCtx({
+        sessionManager: {
+          getEntries: vi.fn().mockReturnValue([
+            { type: "custom", customType: "focus-crazy-find-guard", data: { enabled: false } },
+          ]),
+        },
+      }),
+    );
+
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "bash", input: { command: "find / -name x" } },
+      createCtx(),
+    );
+    expect(result).toBeUndefined();
+  });
+
+  it("restores persisted enabled state on session_start with no flags", async () => {
+    await pi._callbacks.session_start[0](
+      {},
+      createCtx({
+        sessionManager: {
+          getEntries: vi.fn().mockReturnValue([
+            { type: "custom", customType: "focus-crazy-find-guard", data: { enabled: true } },
+          ]),
+        },
+      }),
+    );
+
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "bash", input: { command: "find ~ -name x" } },
+      createCtx(),
+    );
+    expect(result).toEqual(expect.objectContaining({ block: true }));
+  });
+
+  it("does not persist on a fresh default-ON start", async () => {
+    await pi._callbacks.session_start[0](
+      {},
+      createCtx({ sessionManager: { getEntries: vi.fn().mockReturnValue([]) } }),
+    );
+    const cfEntries = pi._entries.filter(
+      (e: any) => e.type === "focus-crazy-find-guard",
+    );
+    expect(cfEntries).toHaveLength(0);
+  });
+
+  it("denial names the offending path and mentions the off command", async () => {
+    await invoke(pi, "focus-crazy-find-guard-on");
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "bash", input: { command: "find / -name x" } },
+      createCtx(),
+    );
+    expect(result).toEqual(expect.objectContaining({ block: true }));
+    expect(result.reason).toContain("[BASH DENIED — CRAZY FIND GUARD]");
+    expect(result.reason).toContain("/");
+    expect(result.reason).toContain("/focus-crazy-find-guard-off");
+  });
+
+  it("blocks a chained command containing a crazy find", async () => {
+    await invoke(pi, "focus-crazy-find-guard-on");
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "bash", input: { command: 'find ~/dev/concept -name "x.md"; find / -name "x.md"' } },
+      createCtx(),
+    );
+    expect(result).toEqual(expect.objectContaining({ block: true }));
+    expect(result.reason).toContain("[BASH DENIED — CRAZY FIND GUARD]");
+  });
+
+  it("does not block non-find bash commands when enabled", async () => {
+    await invoke(pi, "focus-crazy-find-guard-on");
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "bash", input: { command: "ls -la" } },
+      createCtx(),
+    );
     expect(result).toBeUndefined();
   });
 });
