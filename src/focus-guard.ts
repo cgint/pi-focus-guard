@@ -640,6 +640,27 @@ export default function focusGuard(pi: ExtensionAPI) {
   });
 
   pi.on("tool_call", async (event, ctx) => {
+    if (event.toolName === "bash") {
+      const rawCommand = (event.input as { command?: unknown }).command;
+      const bashCommand = typeof rawCommand === "string" ? rawCommand.trim() : "";
+
+      if (crazyFindGuardEnabled && bashCommand && bashCommand.includes("find")) {
+        try {
+          const findings = detectCrazyFind(bashCommand, ctx.cwd, os.homedir());
+          if (findings.length > 0) {
+            return { block: true, reason: formatCrazyFindBlockedReason(findings) };
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { block: true, reason: formatCrazyFindParseError(msg) };
+        }
+      }
+
+      if (commitGuardEnabled && bashCommand && commandContainsGitCommit(bashCommand)) {
+        return { block: true, reason: formatCommitGuardBlockedReason() };
+      }
+    }
+
     const discussPolicy = getDiscussEffectivePolicy(activeDiscussMode);
     if (!isToolAllowedByDiscussPolicy(event.toolName, discussPolicy)) {
       if (discussPolicy.mode === "read" && event.toolName === "bash") {
@@ -653,31 +674,6 @@ export default function focusGuard(pi: ExtensionAPI) {
       }
 
       return { block: true, reason: formatDiscussBlockedToolReason(event.toolName, discussPolicy) };
-    }
-
-    if (commitGuardEnabled && event.toolName === "bash") {
-      const rawCommand = (event.input as { command?: unknown }).command;
-      if (typeof rawCommand === "string" && commandContainsGitCommit(rawCommand)) {
-        return { block: true, reason: formatCommitGuardBlockedReason() };
-      }
-    }
-
-    if (crazyFindGuardEnabled && event.toolName === "bash") {
-      const rawCommand = (event.input as { command?: unknown }).command;
-      if (typeof rawCommand === "string") {
-        const trimmed = rawCommand.trim();
-        if (trimmed && trimmed.includes("find")) {
-          try {
-            const findings = detectCrazyFind(trimmed, ctx.cwd, os.homedir());
-            if (findings.length > 0) {
-              return { block: true, reason: formatCrazyFindBlockedReason(findings) };
-            }
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            return { block: true, reason: formatCrazyFindParseError(msg) };
-          }
-        }
-      }
     }
 
     if (!["write", "edit", "bash"].includes(event.toolName)) return undefined;
