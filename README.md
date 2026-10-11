@@ -1,204 +1,131 @@
 # pi-focus-guard
 
-Successor Pi extension that groups the existing focus-related guard rails under one clear command family.
+Unified focus-related guard rails and collaboration controls for Pi under one clear `/focus-*` command family.
 
-`pi-focus-guard` is intended to replace the separate `pi-write-guard` and `pi-discuss-mode` extensions. The core idea is not to invent new semantics, but to make the related controls visibly belong together by exposing them under `/focus-*` commands.
+`pi-focus-guard` groups mode switching, filesystem boundaries, execution safeguards, and autonomous goal tracking into a single cohesive extension. Instead of cold security blockades, focus controls act as **semantic collaboration signals** that explain *why* boundaries exist, building mutual situational awareness between user and agent.
 
-## Intent
+For our philosophy on agentic agency, boundaries as collaboration signals, and pairing discipline, see [`docs/philosophy-and-north-star.md`](docs/philosophy-and-north-star.md).
 
-When collaborating with an agent, the user often wants to control the working mode at a conversational level:
+For deep behavioral specifications, AST detection mechanics, and configuration hierarchies, see [`docs/features.md`](docs/features.md).
 
-- Are we discussing only, or may the agent act?
-- If the agent may act, where may it write?
-- Are we still reviewing and finishing collaboratively, or may the agent commit?
+---
 
-The extension makes those mode boundaries explicit and visible in one namespace.
+## Feature Groups
 
-## Rationale
+### 🛡️ Write Guard
+* **Goal & Intent:** Keep filesystem modifications confined to explicit, approved directories.
+* **Why it matters:** Prevents agents from modifying files outside active task boundaries or writing across unrelated directories. Writes via `write`, `edit`, and shell redirections/mutations in `bash` are validated against the allowlist.
+* **Key Commands:** `/focus-write-guard <dirs>`, `/focus-write-guard`, `/focus-write-guard-all`
+* **Startup Flags:** `--write-guard <dirs>`, `--write-guard-all`, `--write-guard-off`
+* 📖 *Full details:* [Write Guard in docs/features.md](docs/features.md#write-guard)
 
-The old extensions solve related problems but appear as unrelated command families:
+### 💬 Discuss Mode
+* **Goal & Intent:** Explicitly control when the agent may execute actions versus when it should step back to discuss or investigate.
+* **Why it matters:** Prevents eager execution before ideas are clear. Supports three distinct collaboration modes:
+  * `off`: Normal execution.
+  * `block`: Strictly steps back from all tools to discuss architecture, ideas, and trade-offs.
+  * `read`: Permits non-mutating inspection (read-only `bash`, inspection tools, subagents, and advisors) while blocking all `write` and `edit` calls.
+* **Key Commands:** `/focus-discuss off|block|read`, `/focus-discuss-off`, `/focus-discuss-block`, `/focus-discuss-read`
+* **Startup Flags:** `--dm-off`, `--dm-block`, `--dm-read`
+* **Inline Directives:** `-do:`, `-db:`, `-dr:` (switch mode directly inside a prompt)
+* 📖 *Full details:* [Discuss Mode in docs/features.md](docs/features.md#discuss-mode)
 
-- `pi-write-guard` controls where writes may happen.
-- `pi-discuss-mode` controls whether tool use is allowed at all.
+### 🚫 Commit Guard
+* **Goal & Intent:** Prevent premature git commits until collaborative review is finished.
+* **Why it matters:** Keeps the agent from unilaterally committing changes while the user is still reviewing diffs, verifying edge cases, and deciding on milestones.
+* **Key Commands:** `/focus-commit-guard`, `/focus-commit-guard-on`, `/focus-commit-guard-off`
+* **Startup Flags:** `--commit-guard`, `--commit-guard-on`, `--commit-guard-off`
+* 📖 *Full details:* [Commit Guard in docs/features.md](docs/features.md#commit-guard)
 
-In practice, both are focus controls: they communicate user intent about the current collaboration phase. A unified extension reduces command discovery friction and makes session state easier to reason about.
+### 🧭 Crazy-Find Guard
+* **Goal & Intent:** Shield the session from runaway filesystem scans rooted at `/` or user home (`~`).
+* **Why it matters:** AI agents frequently launch unbounded `find /` or `find ~` commands that freeze sessions, hit permissions walls, or scan giant external volumes. Enabled by default, while project-scoped searches (e.g. `find .`, `find ./src`, `find ~/dev/repo`) remain completely unrestricted.
+* **Key Commands:** `/focus-crazy-find-guard`, `/focus-crazy-find-guard-on`, `/focus-crazy-find-guard-off`
+* **Startup Flags:** `--crazy-find-guard`, `--crazy-find-guard-on`, `--crazy-find-guard-off`
+* 📖 *Full details:* [Crazy-Find Guard in docs/features.md](docs/features.md#crazy-find-guard)
 
-## North Star & Philosophy
+### 🎯 Goal Loop
+* **Goal & Intent:** Anchor multi-turn agent work to a clear session goal via turn-end cross-checking.
+* **Why it matters:** Instead of stopping after a single preliminary step, an active session goal nudges the agent at the end of each turn to self-evaluate: *Is this goal genuinely reached? If not, keep working; if it is, release to the user.*
+* **Key Commands:** `/focus-goal-start <def>`, `/focus-goal-start-submit <def>`, `/focus-goal-suggest`, `/focus-goal`, `/focus-goal-end`
+* 📖 *Full details:* [Goal Loop in docs/features.md](docs/features.md#goal-loop)
 
-`pi-focus-guard` is grounded in a meta-level vision for human-agent pairing: **focus controls are semantic collaboration signals, not cold security blockades.**
+---
 
-* **Shared Situational Awareness:** Cold filesystem restrictions (like read-only OS sandboxes) give zero semantic context, causing AI agents to view boundaries as technical bugs to route around. `pi-focus-guard` communicates *why* a boundary exists, telling a clear narrative story across collaboration phases.
-* **Telling a Story:** Every guard banner and reminder message explicitly frames boundaries as policy agreements ("*Treat denied writes as policy boundaries, not technical failures to route around*").
-* **Honest Progress Over Cheap Shortcuts:** We reject fast, superficial mini-solutions and hacks in favor of verified, high-quality, durable progress.
-* **Iterative Hardening:** We continuously observe what works in practice, prune friction that adds no value, and harden the mechanisms that build mutual trust and reliability.
+## Quick Reference
 
-For the detailed meta-level framework on agentic agency and trust, see [`docs/philosophy-and-north-star.md`](docs/philosophy-and-north-star.md).
+### Commands Cheat-Sheet
 
-The intended command shape is:
+| Command | Description |
+| :--- | :--- |
+| `/focus-write-guard <dirs>` | Set write allowlist for the current session (comma/space-separated) |
+| `/focus-write-guard` | Display current write guard policy and allowed directories |
+| `/focus-write-guard-all` | Disable write restrictions for this session |
+| `/focus-discuss off\|block\|read` | Switch discuss mode (`off`, `block`, or `read`) |
+| `/focus-discuss` | Display active discuss mode status |
+| `/focus-discuss-off` | Disable discuss mode (allow all tools) |
+| `/focus-discuss-block` | Block all tool calls (conceptual alignment) |
+| `/focus-discuss-read` | Enter read-only mode (allow inspection tools & read-only bash) |
+| `/focus-commit-guard` | Show commit guard status |
+| `/focus-commit-guard-on` | Block `git commit` commands until review is complete |
+| `/focus-commit-guard-off` | Allow `git commit` commands again |
+| `/focus-crazy-find-guard` | Show crazy-find guard status |
+| `/focus-crazy-find-guard-on` | Enable crazy-find guard (block `find /` and `find ~`) |
+| `/focus-crazy-find-guard-off` | Disable crazy-find guard (allow unrestricted finds) |
+| `/focus-goal-start <def>` | Arm turn-end goal cross-check without triggering an agent turn ($\le 500$ chars) |
+| `/focus-goal-start-submit <def>` | Arm goal and immediately submit definition as user prompt to start work |
+| `/focus-goal-suggest` | Ask the agent to propose a single adoptable session goal |
+| `/focus-goal` | Print active goal definition, or state that none is active |
+| `/focus-goal-end` | Disarm and clear active goal without judging completion |
 
-```text
-/focus-write-guard ...
-/focus-write-guard-all
-/focus-discuss ...
-/focus-discuss-off
-/focus-discuss-read
-/focus-discuss-block
-/focus-commit-guard
-/focus-commit-guard-on
-/focus-commit-guard-off
-/focus-crazy-find-guard
-/focus-crazy-find-guard-on
-/focus-crazy-find-guard-off
-/focus-goal-start <definition>
-/focus-goal-start-submit <definition>
-/focus-goal-suggest
-/focus-goal-end
-/focus-goal
-```
+### Startup Flags
 
-Startup flags can set the initial mode:
+| Flag | Description |
+| :--- | :--- |
+| `--write-guard <dirs>` | Start session with write allowlist set to comma-separated directories |
+| `--write-guard-all` / `--write-guard-off` | Start session with write guard disabled (overrides persisted state) |
+| `--dm-off` | Start session with discuss mode disabled (overrides persisted state) |
+| `--dm-block` | Start session in discuss block mode (all tools blocked) |
+| `--dm-read` | Start session in discuss read-only mode (inspection tools only) |
+| `--commit-guard` / `--commit-guard-on` | Start session with commit guard enabled |
+| `--commit-guard-off` | Start session with commit guard disabled |
+| `--crazy-find-guard` / `--crazy-find-guard-on` | Start session with crazy-find guard enabled (default) |
+| `--crazy-find-guard-off` | Start session with crazy-find guard disabled |
 
-```text
---write-guard <dirs>
---write-guard-all
---write-guard-off
---dm-off
---dm-read
---dm-block
---commit-guard
---commit-guard-on
---commit-guard-off
---crazy-find-guard
---crazy-find-guard-on
---crazy-find-guard-off
-```
+*Precedence:* Explicit `off` flags override on/read/block flags and persisted state for their respective guard.
 
-Explicit `off` flags override persisted state for their guard after all explicitly configured write allowlists have been validated; an invalid lower-priority source is still an activation error.
+### Inline Discuss Directives
 
-### Write-guard configuration failures and reload
+Discuss mode can be changed inline when submitting a request:
+* `-do: <message>` — Disable discuss mode and process message.
+* `-db: <message>` — Set discuss mode to block and process message.
+* `-dr: <message>` — Set discuss mode to read-only and process message.
 
-An explicitly configured write allowlist must contain at least one directory. Empty `--write-guard` or `PI_WRITE_GUARD_DIRS`, an empty persisted allowlist, and an explicitly present empty `allowedDirs` list in `.pi/settings.json` fail at session activation rather than waiting for a write attempt. Every explicit source is validated even when a valid or `off` higher-priority source would otherwise select the active policy. Malformed or unreadable settings (other than a missing settings file), a non-array `allowedDirs`, and any non-string member are also configuration errors. Pi reports the source and calls `ctx.shutdown()` so interactive and RPC sessions close when idle. Pi documents `ctx.shutdown()` as a no-op in print mode; print invocations instead finish normally after their prompts.
+Can be placed at the start or end of the prompt (e.g. `-dr: check why tests fail`). A directive-only message changes the mode without starting an agent turn. Follow-up queued directives activate when their turn begins.
 
-A missing `.pi/settings.json` or an absent supported allowlist key means the write guard is unconfigured. The active policy is validated at `session_start` and on `/focus-write-guard` transitions; tool calls use that in-memory policy and do not reread configuration. Edit settings and use `/reload`, or start/resume/fork a session, to activate settings changes.
+### Status Bar Icon Legend
 
-Discuss mode can also be changed inline while submitting a request:
+`pi-focus-guard` surfaces active guard states in the Pi footer status bar:
 
-```text
--do: implement the change
--db: explain the architecture
--dr: investigate the issue
+| Guard Area | Icon | Meaning |
+| :--- | :---: | :--- |
+| **Write Guard** | `✍️` | Write guard is **OFF** (no write restrictions) |
+| | `🔰` | Write guard is active, restricted strictly to project `cwd` |
+| | `🛡️` | Write guard is active, restricted to custom allowed directories |
+| **Discuss Mode** | `✅` | Discuss mode is **OFF** (all tools allowed) |
+| | `🔒` | Discuss mode is **BLOCK** (all tools blocked) |
+| | `📖` | Discuss mode is **READ-ONLY** (inspection tools & read-only bash allowed) |
+| **Commit Guard** | `📝` | Commit guard is **OFF** (`git commit` allowed) |
+| | `🚫` | Commit guard is **ON** (`git commit` blocked) |
+| **Crazy-Find Guard**| *(none)* | *(No icon to keep status bar uncluttered; defaults to ON)* |
+| **Goal Loop** | `🎯` | Goal is active (turn-end nudge armed) |
+| | *(cleared)*| No active goal |
 
-Please investigate what needs to be done.
--dr:
-```
+---
 
-The directive is removed before the request is processed. Only one directive is allowed per message. A directive-only message changes the mode without starting an agent turn. `-do:` matches `/focus-discuss-off`: it disables discuss mode for the current session and persists an `off` override (tombstone) so that a resumed session without `--dm-*` flags starts in off mode. Inline directives are processed for interactive and RPC input, not extension-generated messages.
+## Documentation
 
-Queued follow-up directives activate when their request begins, not when they are queued. Every effective discuss-mode transition updates enforcement and footer status, applies mode-specific persistence, and emits model-visible `[discuss-mode]` context. `off` is persisted as a tombstone when explicitly set (`--dm-off`, `/focus-discuss-off`, or `-do:`); on resume the last persisted `discuss-mode` entry wins, so an `off` tombstone restores off mode and unblocks tools.
-
-## Scope
-
-### Preserve existing behavior while porting
-
-The write-guard and discuss-mode logic should be ported without behavioral adaptation. The successor should keep the existing semantics from the source extensions unless a later change is explicitly requested.
-
-That means:
-
-- Write allowlist behavior should match `pi-write-guard`.
-- Bash write detection should match `pi-write-guard`.
-- Discuss block/off behavior should match `pi-discuss-mode`; read mode intentionally diverges as documented above by permitting non-`write`/`edit` tools and read-only `bash`.
-- In read mode, `write` and `edit` calls are blocked and bash is allowed only when classified as read-only. Read mode does not grant a scratch-write exception.
-- Read-only bash classification should match `pi-discuss-mode`.
-- Existing denial-message intent should remain cooperative: denied actions are policy boundaries, not technical failures to route around.
-
-### New behavior: commit guard and crazy-find guard
-
-`pi-focus-guard` adds two new guards:
-
-#### Commit guard
-
-```text
-/focus-commit-guard
-/focus-commit-guard-on
-/focus-commit-guard-off
-```
-
-When enabled, bash commands containing `git commit` are blocked.
-
-The block message explains that the user intentionally does not want commits yet, because the collaboration phase is still about finishing together, reviewing the diff, and deciding when the milestone is ready.
-
-The commit guard also exposes a footer status icon, matching the style of the discuss and write guards, so the user can see at a glance whether premature commits are currently blocked: `📝` means commit guard is off, `🚫` means commit guard is on.
-
-This guard is not a security boundary. It is a collaboration signal that prevents premature commits and encourages review before finalizing work.
-
-#### Crazy-find guard
-
-```text
-/focus-crazy-find-guard
-/focus-crazy-find-guard-on
-/focus-crazy-find-guard-off
-```
-
-When enabled (default on fresh sessions), bash commands executing unrestricted filesystem sweeps rooted at `/` or the user's home directory (`~`, `$HOME`, or the user's home path) are blocked.
-
-Normal, project-scoped searches (e.g. `find .`, `find ./src`, `find ~/dev/project`, `find /tmp`) remain completely allowed. If a chained command or pipeline contains even one crazy find (e.g. `find ~/dev/concept -name "x.md"; find / -name "x.md"`), the entire bash call is blocked with clear guidance for the LLM to narrow the path or prompt the user to run `/focus-crazy-find-guard-off`.
-
-The crazy-find guard does not display a footer icon, keeping the bottom status bar clean.
-
-#### Goal loop
-
-```text
-/focus-goal-start <definition>
-/focus-goal-start-submit <definition>
-/focus-goal-suggest
-/focus-goal-end
-/focus-goal
-```
-
-A session-scoped goal (a plain string of at most 500 characters, no conventions) describes an end state. While a goal is active, the moment the agent would hand control back to the user, it is nudged to cross-check the goal against the current state and decide: release to the user (genuinely done) or keep working (not done). The nudge carries the goal's own description verbatim and no verdict — the agent judges "done" itself, case by case, against what the goal states (a test that must pass, a plan that must be finished, a file that must exist, ...).
-
-- `/focus-goal-start <definition>` — start the goal and arm the turn-end cross-check (definition is trimmed; over 500 characters is rejected with an error; the agent is informed without starting a turn of its own).
-- `/focus-goal-start-submit <definition>` — the "arm and go" form: identical validation and arming to `/focus-goal-start`, plus it immediately submits the definition as a user-role message that triggers an agent turn.
-- `/focus-goal-suggest` — ask the agent to propose one session goal: emits a fixed prompt (user-role message with idle-aware routing, described below) that asks for a single-line definition of at most 500 characters whose detail lives in files per this repo's documentation standard, plus a short rationale. Suggestion only — it never starts or arms a goal; adopt the proposal with `/focus-goal-start` or `/focus-goal-start-submit`.
-- `/focus-goal-end` — disarm and discard the goal without judging whether it was achieved.
-- `/focus-goal` — show the active goal's definition, or report that no goal is active.
-
-**Passive vs. active goal start.** `/focus-goal-start` is passive: it arms the cross-check and waits for your next prompt to kick off work. `/focus-goal-start-submit` is active: after arming the identical goal, it submits the definition text as the user message of a new agent turn, so the agent starts working toward the goal in the same command. Routing is idle-aware: when the session is idle, the message is sent immediately as a new turn; when the agent is busy (streaming), it is queued as a follow-up so it is not lost. In both cases prompt-template expansion is disabled, so the goal text is passed through verbatim. Validation (non-empty, ≤500 characters) runs before any submission — a rejected definition neither arms nor sends.
-
-The goal is session-scoped: it does not persist to a project setting and does not survive a session restart. v1 has no cross-check budget or forced-release cap — at most one nudge per settled agent run while a goal is active, and the agent may release at any point it judges the goal reached. The footer status icon appears only while a goal is active: `🎯` means a goal is active, and the slot is cleared (no icon) when no goal is active.
-
-## Successor plan
-
-`pi-focus-guard` is planned as the effective successor to:
-
-- `pi-write-guard`
-- `pi-discuss-mode`
-
-Those older extensions can be deprecated later after retained behavior is verified and intentional divergences are documented.
-
-## Non-goals for the initial port
-
-- Do not redesign write-guard policy semantics.
-- Preserve legacy discuss block-mode and persistence semantics. Discuss read mode intentionally diverges from the legacy curated allowlist: it blocks only `write` and `edit`, requires `bash` commands to be read-only, and permits every other tool name, including session-local and extension tools.
-- Do not silently add new config precedence rules; startup flag precedence is explicit: off flags override on/read/block flags and persisted state for that guard.
-- Inline discuss directives change the current session mode without changing the existing persistence semantics.
-- Do not keep legacy command names unless explicitly chosen later.
-- Do not treat denied writes or blocked commits as errors to work around.
-
-## Verification expectations
-
-Before treating this successor as ready, tests should show parity for retained behavior and prove documented divergences:
-
-- focus-prefixed command registration;
-- startup flag registration and initial-mode behavior;
-- write/edit path allowlist blocking;
-- bash write detection;
-- discuss block mode;
-- discuss read mode blocks `write` and `edit` while allowing all other non-bash tools, including extension tools;
-- read-only bash allowance and write-like bash blocking;
-- `/focus-commit-guard` printing commit guard status;
-- commit guard blocking `git commit` while enabled;
-- commit guard allowing non-commit bash when enabled;
-- commit guard allowing `git commit` when disabled;
-- commit guard footer icon reflecting enabled/disabled state;
-- goal loop: start/submit/suggest/end/show commands, 500-character limit, turn-end nudge with the goal verbatim, no nudge without an active goal, latch re-arm after settle, and idle/busy `sendUserMessage` routing.
+* [`docs/features.md`](docs/features.md) — Comprehensive feature specifications, AST analysis, configuration precedence, and lifecycle invariants.
+* [`docs/philosophy-and-north-star.md`](docs/philosophy-and-north-star.md) — Human-agent pairing principles and semantic collaboration signals.
+* [`docs/parity-matrix.md`](docs/parity-matrix.md) — Legacy migration parity and verification records.
+* [`docs/feature-impl/`](docs/feature-impl/) — Design docs, spikes, and implementation plans per feature.
