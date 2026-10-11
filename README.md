@@ -99,37 +99,19 @@ pi -e /path/to/pi-focus-guard
 
 ## Quick Reference
 
-### Commands Cheat-Sheet
+### Daily Driver Cheat-Sheet
 
-| Command | Description |
-| :--- | :--- |
-| `/focus-discuss off\|block\|read` | Switch discuss mode (`off`, `block`, or `read`) |
-| `/focus-discuss-off` / `-read` / `-block` | Quick shortcuts to switch discuss modes |
-| `/focus-discuss` | Display active discuss mode status |
-| `/focus-write-guard <dirs>` | Set write allowlist for the current session (comma/space-separated) |
-| `/focus-write-guard` | Display current write guard policy and allowed directories |
-| `/focus-write-guard-all` | Disable write restrictions for this session |
-| `/focus-goal-start <def>` | Arm turn-end goal cross-check without triggering a turn ($\le 500$ chars) |
-| `/focus-goal-start-submit <def>` | Arm goal and immediately submit definition as user prompt to start work |
-| `/focus-goal-suggest` | Ask the agent to propose a single adoptable session goal |
-| `/focus-goal` | Print active goal definition, or state that none is active |
-| `/focus-goal-end` | Disarm and clear active goal without judging completion |
-| `/focus-crazy-find-guard-on` / `-off` | Toggle crazy-find blocking on/off |
-| `/focus-crazy-find-guard` | Show crazy-find guard status |
-| `/focus-commit-guard-on` / `-off` | Toggle commit blocking on/off |
-| `/focus-commit-guard` | Show commit guard status |
+The core interactive controls for each phase of pairing:
 
-### Startup Flags
+| Guard Rail | Primary Command | Startup Flag | Footer Icon | Details |
+| :--- | :--- | :--- | :---: | :---: |
+| **💬 Discuss Mode** | `/focus-discuss read\|block\|off` *(or `-dr:`, `-db:`, `-do:`)* | `--dm-read`, `--dm-block` | `📖` `🔒` `✅` | [Spec](docs/features/discuss-mode.md) |
+| **🛡️ Write Guard** | `/focus-write-guard <dirs>` *(or `all`)* | `--write-guard <dirs>` | `🛡️` `🔰` `✍️` | [Spec](docs/features/write-guard.md) |
+| **🎯 Goal Loop** | `/focus-goal-start-submit <def>` | *(session-scoped)* | `🎯` | [Spec](docs/features/goal-loop.md) |
+| **🧭 Crazy-Find Guard**| `/focus-crazy-find-guard-off` | `--crazy-find-guard-off` | *(none)* | [Spec](docs/features/crazy-find-guard.md) |
+| **🚫 Commit Guard** | `/focus-commit-guard-on` / `-off` | `--commit-guard-on` | `🚫` `📝` | [Spec](docs/features/commit-guard.md) |
 
-| Flag | Description |
-| :--- | :--- |
-| `--dm-read` / `--dm-block` / `--dm-off` | Start session in discuss read-only, block, or off mode |
-| `--write-guard <dirs>` | Start session with write allowlist set to comma-separated directories |
-| `--write-guard-all` / `--write-guard-off` | Start session with write guard disabled |
-| `--commit-guard-on` / `--commit-guard-off` | Start session with commit guard enabled or disabled |
-| `--crazy-find-guard-off` | Start session with crazy-find guard disabled (defaults to ON) |
-
-*Precedence:* Explicit `off` flags override on/read/block flags and persisted state for their respective guard.
+> 📖 *For the complete 17-command inventory, all aliases, and the full 12-flag startup matrix with precedence rules, see the [Authoritative Command Reference](docs/features/README.md#authoritative-command-inventory).*
 
 ### Inline Discuss Directives
 
