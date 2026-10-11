@@ -1,4 +1,4 @@
-# Request (20261011_163846)
+# Request (20261011_172452)
 
 ```
 Review the changes in the attached diff file against the full codebase context and any relevant OpenSpec artifacts. Focus only on the regions that appear in the diff — use the surrounding codebase and OpenSpec artifacts for context, not as additional review targets.
@@ -12,105 +12,104 @@ For each changed region, evaluate:
 
 Only report real issues — not style preferences or linter noise. Cite exact file and line for each finding.
 
-
-**Additional focus:** Feature: /focus-goal-suggest (5th goal-loop command; requirements+plan in untracked docs/feature-impl/20261011-goal-suggest/. Review focus: src/goal/goal.ts new GOAL_SUGGEST_PROMPT + focus-goal-suggest registration (suggest-only, no goal-state side effects, idle/busy sendUserMessage routing), test coverage in test/goal-loop.test.ts + focus-guard invariant, README command lists. Verify against the settled requirements: no args, no side effects, prompt contract (user stop-triggers, repo-agnostic standard line, 500-char rule, single-line definition).
-
 ```
 
 # Response
 
-### Overview
+Here is the review of the changes in `pi-focus-guard/._cg_tmp_diff.txt` evaluated against the codebase context and project documentation.
 
-The diff implements the `/focus-goal-suggest` command—the 5th command of the goal-loop subsystem—which requests the agent to propose an adoptable session goal without modifying any goal state. The implementation spans `src/goal/goal.ts`, `README.md`, `test/focus-guard.test.ts`, and `test/goal-loop.test.ts`.
+---
+
+### Overview of Diff
+
+The diff changes the footer status behavior of the `goal-loop` subsystem (`src/goal/goal.ts`):
+- **Previous behavior**: Displayed `🎯` when no goal was active and `⭕` when a goal was active.
+- **New behavior**: Displays `⭕` only while a goal is active; clears the slot (`undefined`) when no goal is active.
+- Updates documentation (`README.md`, `5_implementation__goal-loop.md`) and unit tests (`test/goal-loop.test.ts`) accordingly.
 
 ---
 
 ### Evaluation by Changed Region
 
-#### 1. `src/goal/goal.ts` (Lines 6–28, 57, 142–156 in diff)
+#### 1. `src/goal/goal.ts` (Lines 26–29 & 74–78)
 
-- **`GOAL_SUGGEST_PROMPT` constant (Lines 11–32 in file):**
-  - **Confirmed:** Matches verbatim the prompt signed off in `docs/feature-impl/20261011-goal-suggest/2_requirements__goal-suggest.md` §Prompt text.
-  - **Contract checks:**
-    - User stop-triggers: `"clearly need me (the user) for requirements or goal-setting, or when you are SEVERELY blocked"`
-    - Broad agent autonomy: `"otherwise using your tools, skills, sub-agents, and advisor smartly and wisely to get forward"`
-    - Repo-agnostic documentation standard: `"per this repo's documentation standard: write the description, plan, and status down in files, and reference them from the goal"` (no hardcoded path like `docs/feature-impl/`).
-    - 500-character constraint: `"at most 500 characters (the /focus-goal-start limit)"`
-    - Single-line format: `"Present exactly one proposed goal definition, on a single line, ready to paste into /focus-goal-start, followed by a short rationale."`
-  - Exported so unit tests assert against the identical string that production code sends.
+```diff
+-const GOAL_SYMBOL_OFF = "🎯";
+ const GOAL_SYMBOL_ACTIVE = "⭕";
+...
+   function updateGoalStatus(ctx: ExtensionContext): void {
+     if (!ctx.hasUI) return;
+-    ctx.ui.setStatus?.(GOAL_STATUS_KEY, activeGoal ? GOAL_SYMBOL_ACTIVE : GOAL_SYMBOL_OFF);
++    // Footer icon shows only while a goal is active; cleared (no icon) otherwise.
++    ctx.ui.setStatus?.(GOAL_STATUS_KEY, activeGoal ? GOAL_SYMBOL_ACTIVE : undefined);
+   }
+```
 
-- **Command Registration `/focus-goal-suggest` (Lines 142–156 in file):**
-  - **Args handling:** Handler takes `(_args, ctx)` and ignores arguments, satisfying the requirement that `/focus-goal-suggest` takes no arguments and behaves identically regardless of any extra input.
-  - **State isolation:** Suggestion-only contract is preserved. The handler does not touch `activeGoal`, `isNudging`, UI status, or call `startGoal()`.
-  - **Message routing:** 
-    - Idle (`ctx.isIdle()`): invokes `pi.sendUserMessage(GOAL_SUGGEST_PROMPT, { expandPromptTemplates: false })`.
-    - Busy: queues the prompt with `{ deliverAs: "followUp", expandPromptTemplates: false }`.
-    - Template expansion is explicitly disabled, matching the established pattern in `/focus-goal-start-submit`.
-
----
-
-#### 2. `README.md` (Lines 54, 153, 162 in diff)
-
-- **Confirmed:** Adds `/focus-goal-suggest` to both global command listings (`Lines 54`, `153`) and provides a concise description under the Goal loop section (`Line 162`).
-- **Accuracy:** Clarifies that the command is suggestion-only, never starts or arms a goal, routes via user-role messages with idle/busy awareness, and points to `/focus-goal-start` or `/focus-goal-start-submit` for adoption.
+- **Correctness**: **Confirmed correct.** Passing `undefined` to `ctx.ui.setStatus?(key, undefined)` is the standard Pi extension mechanism to clear a status slot. When `activeGoal` is a string, `"⭕"` is displayed; when `activeGoal` is `null`, the status item is cleared.
+- **Side effects**: **No regressions.**
+  - `GOAL_SYMBOL_OFF` was a module-internal constant (not exported). Removing it introduces no export or import breaks.
+  - All call sites to `updateGoalStatus` (`session_start` [line 71], `startGoal` [line 82], `endGoal` [line 93], and `/focus-goal` command handler [line 166]) pass an `ExtensionContext`. UI-less contexts are guarded by `if (!ctx.hasUI) return;`.
+- **Spec alignment**: **Confirmed aligned.** Matches the design intent (similar to `crazy-find-guard`, avoiding permanent footer clutter when the feature is inactive).
+- **Security**: **No impact.** No auth, execution, or data leaks involved.
+- **Test coverage**: Good. `session_start` clearing and `focus-goal-start` setting are tested. *(See test coverage recommendation below.)*
 
 ---
 
-#### 3. `test/focus-guard.test.ts` (Line 88 in diff)
+#### 2. `test/goal-loop.test.ts` (Lines 312–320)
 
-- **Confirmed:** Adds `"focus-goal-suggest"` to the expected array in `focus command surface > registers only focus-prefixed user commands`.
-- **Alphabetical ordering:** Properly maintained (`focus-goal-start-submit` < `focus-goal-suggest` < `focus-write-guard`).
+```diff
+-  it("updates the footer status for active and none", async () => {
++  it("updates the footer status only when a goal is active", async () => {
+     const ctxOff = createCtx();
+     await pi._callbacks.session_start[0]({}, ctxOff);
+-    expect(ctxOff.ui.setStatus).toHaveBeenCalledWith(GOAL_STATUS_KEY, "🎯");
++    expect(ctxOff.ui.setStatus).toHaveBeenCalledWith(GOAL_STATUS_KEY, undefined);
+ 
+     const ctxOn = await invoke(pi, "focus-goal-start", "a goal");
+     expect(ctxOn.ui.setStatus).toHaveBeenCalledWith(GOAL_STATUS_KEY, "⭕");
+   });
+```
 
----
-
-#### 4. `test/goal-loop.test.ts` (Lines 3, 78, 95, 325–379 in diff)
-
-- **Command Registration (Lines 78, 95):**
-  - Updated assertion count to 5 commands (`focus-goal`, `focus-goal-end`, `focus-goal-start`, `focus-goal-start-submit`, `focus-goal-suggest`).
-  - Added existence check for `fullPi._commands.get("focus-goal-suggest")` when wired via `focusGuard()`.
-- **Dedicated Test Suite `describe("goal-loop /focus-goal-suggest")`:**
-  - **Idle routing:** Asserts immediate dispatch via `pi.sendUserMessage` with `{ expandPromptTemplates: false }` and without `deliverAs`.
-  - **Busy routing:** Asserts queued follow-up via `pi.sendUserMessage` with `{ deliverAs: "followUp", expandPromptTemplates: false }`.
-  - **Argument invariance:** Verifies that passing arbitrary arguments produces an identical prompt dispatch.
-  - **Prompt contract verification:** Asserts key contract tokens (`need me (the user)`, `SEVERELY blocked`, `this repo's documentation standard`, `500 characters`, `/focus-goal-start`) and confirms absence of hardcoded repo paths (`docs/feature-impl`).
-  - **Zero side-effect verification:** Confirms `getActiveGoal()` remains `null`, `pi.sendMessage` (custom messages) is not called, `ctx.ui.setStatus` is untouched, and triggering `agent_end` produces no nudges.
-
----
-
-### Evaluation Criteria
-
-1. **Correctness**:
-   - The implementation adheres strictly to the settled prompt text and routing logic.
-   - Ignores arguments as specified.
-   - Does not mutate session goal state or arm the turn-end nudge.
-2. **Side effects**:
-   - None. Existing commands (`/focus-goal-start`, `/focus-goal-start-submit`, `/focus-goal-end`, `/focus-goal`) and turn-end nudge cross-check behavior remain unaffected.
-3. **Spec alignment**:
-   - Fully aligned with `docs/feature-impl/20261011-goal-suggest/2_requirements__goal-suggest.md` and `3_plan__goal-suggest.md`.
-4. **Security**:
-   - Prompt templates and skill expansions are disabled via `expandPromptTemplates: false`.
-   - The prompt string is constant and immutable, precluding prompt injection via arguments.
-5. **Test coverage**:
-   - Complete coverage for all execution paths (idle send, busy queue, argument invariance, contract verification, and state isolation).
+- **Correctness**: **Confirmed correct.** Tests both the initial `session_start` clearing (`undefined`) and the transition to active (`"⭕"`).
+- **Side effects**: None.
+- **Spec alignment**: Directly verifies the new contract.
+- **Security**: No impact.
+- **Test coverage**:
+  - **Observation / Minor Gap**: The test verifies that `session_start` clears the status to `undefined`, but it does not verify that ending an active goal via `/focus-goal-end` clears it back to `undefined`.
+  - In `test/goal-loop.test.ts:132-137` (`"ends the goal via /focus-goal-end and disarms the cross-check"`), only `getActiveGoal() === null` and `ctx.ui.notify` are asserted, not `ctx.ui.setStatus(GOAL_STATUS_KEY, undefined)`. While `endGoal` shares the same helper `updateGoalStatus`, adding this assertion would guard against any future dissociation of `endGoal` from status updates.
 
 ---
 
-### Findings
+#### 3. Documentation: `README.md` & `docs/.../5_implementation__goal-loop.md`
 
-No bugs, security regressions, or spec misalignments were found in the diff. The implementation fulfills all requirements cleanly.
+- **`README.md` (Line 168)**:
+  - Correctly updates the user-facing description from `🎯 means no goal, ⭕ means a goal is active` to `⭕ means a goal is active, and the slot is cleared (no icon) when no goal is active`.
+- **`docs/feature-impl/20261020-goal-loop/5_implementation__goal-loop.md` (Lines 39–42)**:
+  - Updates implementation notes to reflect that `/focus-goal-end` clears the status icon instead of reverting to `🎯`.
+
+---
+
+### Findings Summary
+
+| Area | Status | Notes |
+| :--- | :--- | :--- |
+| **Bugs / Logic errors** | None found | Implementation is concise, correct, and fail-safe. |
+| **Downstream breakage** | None found | Private symbol deleted; all callers remain compatible. |
+| **Security risks** | None | No security-sensitive code touched. |
+| **Test coverage** | Minor enhancement suggested | Add assertion in `test/goal-loop.test.ts:132` checking that `invoke(pi, "focus-goal-end")` calls `setStatus(GOAL_STATUS_KEY, undefined)`. |
 
 ## Token Usage
 
 🔢 **Model**: gemini-3.8-flash
 
 📊 Token Usage
-  ├─ Prompt:    89627
-  ├─ Response:  1466
-  ├─ Thoughts:  5923
-  └─ Total:     97016
+  ├─ Prompt:    79039
+  ├─ Response:  1356
+  ├─ Thoughts:  9392
+  └─ Total:     89787
 
 ## Generated Files
 
-* Context: .codegiant/20261011_163846_codegiant_context.md
-* Raw Output: .codegiant/20261011_163846_codegiant_llm_raw_output.json
-* Response: .codegiant/20261011_163846_codegiant_llm_response.md
+* Context: .codegiant/20261011_172452_codegiant_context.md
+* Raw Output: .codegiant/20261011_172452_codegiant_llm_raw_output.json
+* Response: .codegiant/20261011_172452_codegiant_llm_response.md
