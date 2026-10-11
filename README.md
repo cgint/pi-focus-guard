@@ -165,7 +165,7 @@ A session-scoped goal (a plain string of at most 500 characters, no conventions)
 
 **Passive vs. active goal start.** `/focus-goal-start` is passive: it arms the cross-check and waits for your next prompt to kick off work. `/focus-goal-start-submit` is active: after arming the identical goal, it submits the definition text as the user message of a new agent turn, so the agent starts working toward the goal in the same command. Routing is idle-aware: when the session is idle, the message is sent immediately as a new turn; when the agent is busy (streaming), it is queued as a follow-up so it is not lost. In both cases prompt-template expansion is disabled, so the goal text is passed through verbatim. Validation (non-empty, ≤500 characters) runs before any submission — a rejected definition neither arms nor sends.
 
-The goal is session-scoped: it does not persist to a project setting and does not survive a session restart. v1 has no cross-check budget or forced-release cap — at most one nudge per settled agent run while a goal is active, and the agent may release at any point it judges the goal reached. The footer status icon appears only while a goal is active: `⭕` means a goal is active, and the slot is cleared (no icon) when no goal is active.
+The goal is session-scoped: it does not persist to a project setting and does not survive a session restart. v1 has no cross-check budget or forced-release cap — at most one nudge per settled agent run while a goal is active, and the agent may release at any point it judges the goal reached. The footer status icon appears only while a goal is active: `🎯` means a goal is active, and the slot is cleared (no icon) when no goal is active.
 
 ## Successor plan
 

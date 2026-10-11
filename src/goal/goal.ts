@@ -26,7 +26,7 @@ export const GOAL_SUGGEST_PROMPT = [
   "  /focus-goal-start, followed by a short rationale.",
 ].join("\n");
 
-const GOAL_SYMBOL_ACTIVE = "⭕";
+const GOAL_SYMBOL_ACTIVE = "🎯";
 
 const GOAL_CUSTOM_TYPE = "goal-loop";
 

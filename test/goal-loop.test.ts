@@ -318,7 +318,7 @@ describe("goal-loop turn-end nudge", () => {
     expect(ctxOff.ui.setStatus).toHaveBeenCalledWith(GOAL_STATUS_KEY, undefined);
 
     const ctxOn = await invoke(pi, "focus-goal-start", "a goal");
-    expect(ctxOn.ui.setStatus).toHaveBeenCalledWith(GOAL_STATUS_KEY, "⭕");
+    expect(ctxOn.ui.setStatus).toHaveBeenCalledWith(GOAL_STATUS_KEY, "🎯");
 
     const ctxEnd = await invoke(pi, "focus-goal-end");
     expect(ctxEnd.ui.setStatus).toHaveBeenCalledWith(GOAL_STATUS_KEY, undefined);
