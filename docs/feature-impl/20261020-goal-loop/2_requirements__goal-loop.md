@@ -73,6 +73,9 @@ handoff moment and decide: release to the user (genuinely done) or keep going (n
    user out.
 6. **Visible status.** The user can see at a glance whether a goal is active (and its
    definition) or that no goal is active.
+   - **6a. Footer icon (amended 2026-10-21, user).** The footer status icon (🎯) appears
+     in the bottom status bar only while a goal is active; the slot is cleared (no icon)
+     when no goal is active.
 7. **Honest "done".** If the agent claims the goal is met but the evidence (per the goal's
    own description) does not support it, that must be surfaced — the cross-check is meant to
    catch premature "done," not rubber-stamp it.
