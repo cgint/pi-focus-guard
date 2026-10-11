@@ -2,7 +2,7 @@
 
 **Focus controls and semantic guard rails for Pi under one clear `/focus-*` command family.**
 
-When pairing with an AI agent, you don't need a cold, silent sandbox — you need shared situational awareness. `pi-focus-guard` gives you conversational, phase-aware guard rails that communicate *why* boundaries exist so the agent cooperates rather than routing around them.
+When pairing with an AI agent, you don't need a cold, silent sandbox — you need **shared situational awareness**. `pi-focus-guard` gives you conversational, phase-aware guard rails that communicate *why* boundaries exist so the agent cooperates rather than routing around them.
 
 ---
 
