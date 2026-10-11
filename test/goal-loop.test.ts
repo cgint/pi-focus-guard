@@ -312,10 +312,10 @@ describe("goal-loop turn-end nudge", () => {
     expect(getActiveGoal()).toBe("a goal");
   });
 
-  it("updates the footer status for active and none", async () => {
+  it("updates the footer status only when a goal is active", async () => {
     const ctxOff = createCtx();
     await pi._callbacks.session_start[0]({}, ctxOff);
-    expect(ctxOff.ui.setStatus).toHaveBeenCalledWith(GOAL_STATUS_KEY, "🎯");
+    expect(ctxOff.ui.setStatus).toHaveBeenCalledWith(GOAL_STATUS_KEY, undefined);
 
     const ctxOn = await invoke(pi, "focus-goal-start", "a goal");
     expect(ctxOn.ui.setStatus).toHaveBeenCalledWith(GOAL_STATUS_KEY, "⭕");

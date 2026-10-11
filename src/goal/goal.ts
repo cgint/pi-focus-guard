@@ -26,7 +26,6 @@ export const GOAL_SUGGEST_PROMPT = [
   "  /focus-goal-start, followed by a short rationale.",
 ].join("\n");
 
-const GOAL_SYMBOL_OFF = "🎯";
 const GOAL_SYMBOL_ACTIVE = "⭕";
 
 const GOAL_CUSTOM_TYPE = "goal-loop";
@@ -75,7 +74,8 @@ export function registerGoalLoop(pi: ExtensionAPI): void {
 
   function updateGoalStatus(ctx: ExtensionContext): void {
     if (!ctx.hasUI) return;
-    ctx.ui.setStatus?.(GOAL_STATUS_KEY, activeGoal ? GOAL_SYMBOL_ACTIVE : GOAL_SYMBOL_OFF);
+    // Footer icon shows only while a goal is active; cleared (no icon) otherwise.
+    ctx.ui.setStatus?.(GOAL_STATUS_KEY, activeGoal ? GOAL_SYMBOL_ACTIVE : undefined);
   }
 
   function startGoal(definition: string, ctx: ExtensionContext): void {

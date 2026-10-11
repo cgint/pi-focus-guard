@@ -36,9 +36,9 @@ Date: 2026-10-20 · Status: **implemented (submit variant added 2026-10-11)** ·
   (queued as a follow-up). Validation (non-empty, ≤500) runs *before* any
   submission — a rejected definition neither arms nor sends. `expandPromptTemplates: false`
   prevents the goal text from being interpreted as template/skill/command syntax.
-- `/focus-goal-end`: disarms and discards, status back to `🎯`.
+- `/focus-goal-end`: disarms and discards, status icon cleared (no goal icon).
 - `/focus-goal`: shows the active definition or "No active goal".
-- Status key `a4_goal`, symbols `🎯` (none) / `⭕` (active), same pattern as the
+- Status key `a4_goal`, icon `⭕` (active) / cleared (no goal), same pattern as the
   existing guards.
 - Turn-end cross-check: `pi.on("agent_end")` → if a goal is active and the
   `isNudging` latch is clear, send `formatGoalNudge(goal)` via
