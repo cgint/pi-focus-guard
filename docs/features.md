@@ -104,62 +104,6 @@ Please analyze this issue.
 
 ---
 
-## Commit Guard
-
-Prevents premature git commits during collaborative review and finishing phases.
-
-### Goal & Intent
-Commit guard is a collaboration signal, not a security boundary. It keeps the agent from finalizing milestones with `git commit` until the human collaborator has reviewed the diff, agreed on changes, and explicitly signaled readiness.
-
-### Commands & Flags
-* `/focus-commit-guard` — Displays commit guard status.
-* `/focus-commit-guard-on` — Enables commit guard.
-* `/focus-commit-guard-off` — Disables commit guard.
-* `--commit-guard` / `--commit-guard-on` — Starts session with commit guard enabled.
-* `--commit-guard-off` — Starts session with commit guard disabled (overrides persisted state).
-
-### Enforcement Mechanics
-* Runs on `tool_call` when `event.toolName === "bash"`.
-* Inspects the command string for `git commit`.
-* If detected and enabled, blocks execution with a message instructing the agent to finish collaborative review with `git diff` first and ask before committing.
-* Hoisted above discuss-mode checking so git commit attempts are clearly identified with commit-guard guidance even in read-only discuss mode.
-
-### Footer Status Indicator
-* `📝` — Commit guard is OFF (commits allowed).
-* `🚫` — Commit guard is ON (commits blocked).
-
----
-
-## Crazy-Find Guard
-
-Guards against runaway, unrestricted filesystem scans that scan `/` or the user's home directory.
-
-### Goal & Intent
-AI agents frequently run open-ended `find / ...` or `find ~ ...` commands looking for missing files, which can stall the agent, trigger permission denials, scan huge external drives, or consume massive memory. Crazy-find guard blocks these while keeping project-scoped finds completely unrestricted.
-
-### Commands & Flags
-* `/focus-crazy-find-guard` — Displays crazy-find guard status.
-* `/focus-crazy-find-guard-on` — Enables crazy-find guard.
-* `/focus-crazy-find-guard-off` — Disables crazy-find guard.
-* `--crazy-find-guard` / `--crazy-find-guard-on` — Starts session with crazy-find guard enabled.
-* `--crazy-find-guard-off` — Starts session with crazy-find guard disabled.
-
-### Defaults & Scoping
-* **Default:** ON for all fresh sessions.
-* **Persistence:** Persists explicit toggles in session history. Default ON is not persisted as session clutter.
-* **Target Detection:** Parses bash AST (`unbash`) to find starting paths passed to `find`. Handles wrappers like `sudo`, `env`, `nohup`, and `command`.
-* **Blocked Paths:**
-  * Root path `/` (e.g. `find / -name "*.ts"`).
-  * Home directory `~`, `$HOME`, or the user's absolute home directory path.
-* **Allowed Paths:**
-  * Project-relative or subdirectory paths (e.g. `find .`, `find ./src`, `find ~/dev/project`, `find /tmp`).
-* If even one command in a chained pipeline (e.g. `find ./src; find / -name "test"`) targets `/` or `~`, the entire bash call is blocked with guidance to narrow the search scope.
-
-### Footer Status Indicator
-* *(None)* — Kept out of the bottom status bar to maintain a clean TUI status area.
-
----
-
 ## Goal Loop
 
 Session-scoped end-state anchoring with turn-end cross-checking and autonomous nudging.
@@ -199,3 +143,59 @@ Keeps long-running, multi-step agent tasks aligned with an explicit objective. I
 ### Footer Status Indicator
 * `🎯` — Goal is active.
 * *(Cleared / empty slot)* — No goal active.
+
+---
+
+## Crazy-Find Guard
+
+Guards against runaway, unrestricted filesystem scans that scan `/` or the user's home directory.
+
+### Goal & Intent
+AI agents frequently run open-ended `find / ...` or `find ~ ...` commands looking for missing files, which can stall the agent, trigger permission denials, scan huge external drives, or consume massive memory. Crazy-find guard blocks these while keeping project-scoped finds completely unrestricted.
+
+### Commands & Flags
+* `/focus-crazy-find-guard` — Displays crazy-find guard status.
+* `/focus-crazy-find-guard-on` — Enables crazy-find guard.
+* `/focus-crazy-find-guard-off` — Disables crazy-find guard.
+* `--crazy-find-guard` / `--crazy-find-guard-on` — Starts session with crazy-find guard enabled.
+* `--crazy-find-guard-off` — Starts session with crazy-find guard disabled.
+
+### Defaults & Scoping
+* **Default:** ON for all fresh sessions.
+* **Persistence:** Persists explicit toggles in session history. Default ON is not persisted as session clutter.
+* **Target Detection:** Parses bash AST (`unbash`) to find starting paths passed to `find`. Handles wrappers like `sudo`, `env`, `nohup`, and `command`.
+* **Blocked Paths:**
+  * Root path `/` (e.g. `find / -name "*.ts"`).
+  * Home directory `~`, `$HOME`, or the user's absolute home directory path.
+* **Allowed Paths:**
+  * Project-relative or subdirectory paths (e.g. `find .`, `find ./src`, `find ~/dev/project`, `find /tmp`).
+* If even one command in a chained pipeline (e.g. `find ./src; find / -name "test"`) targets `/` or `~`, the entire bash call is blocked with guidance to narrow the search scope.
+
+### Footer Status Indicator
+* *(None)* — Kept out of the bottom status bar to maintain a clean TUI status area.
+
+---
+
+## Commit Guard
+
+Prevents premature git commits during collaborative review and finishing phases.
+
+### Goal & Intent
+Commit guard is a collaboration signal, not a security boundary. It keeps the agent from finalizing milestones with `git commit` until the human collaborator has reviewed the diff, agreed on changes, and explicitly signaled readiness.
+
+### Commands & Flags
+* `/focus-commit-guard` — Displays commit guard status.
+* `/focus-commit-guard-on` — Enables commit guard.
+* `/focus-commit-guard-off` — Disables commit guard.
+* `--commit-guard` / `--commit-guard-on` — Starts session with commit guard enabled.
+* `--commit-guard-off` — Starts session with commit guard disabled (overrides persisted state).
+
+### Enforcement Mechanics
+* Runs on `tool_call` when `event.toolName === "bash"`.
+* Inspects the command string for `git commit`.
+* If detected and enabled, blocks execution with a message instructing the agent to finish collaborative review with `git diff` first and ask before committing.
+* Hoisted above discuss-mode checking so git commit attempts are clearly identified with commit-guard guidance even in read-only discuss mode.
+
+### Footer Status Indicator
+* `📝` — Commit guard is OFF (commits allowed).
+* `🚫` — Commit guard is ON (commits blocked).

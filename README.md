@@ -65,13 +65,15 @@ pi -e /path/to/pi-focus-guard
 
 ---
 
-### 3. 🚫 Commit Guard — *Never commit without human review*
-* **The Problem:** The agent runs `git commit` prematurely before you have reviewed the diff together.
-* **The Solution:** Intercepts `git commit` commands in bash with a cooperative reminder that finishing and review are done collaboratively.
+### 3. 🎯 Goal Loop — *Keep multi-step work anchored to the end state*
+* **The Problem:** The agent stops after completing one small subtask and hands control back when the broader objective is still incomplete.
+* **The Solution:** A session-scoped goal ($\le 500$ chars) that nudges the agent at the end of every turn: *Is this goal genuinely reached? If not, keep working; if so, release to the user.*
 * **Quick Use:**
-  * Commands: `/focus-commit-guard-on`, `/focus-commit-guard-off`, `/focus-commit-guard`
-  * Flags: `--commit-guard-on`, `--commit-guard-off`
-* 📖 *Full details:* [Commit Guard in docs/features.md](docs/features.md#commit-guard)
+  * Arm & Go: `/focus-goal-start-submit "all unit tests in test/auth pass"`
+  * Arm passively: `/focus-goal-start <def>`
+  * Ask for a proposal: `/focus-goal-suggest`
+  * End goal: `/focus-goal-end`
+* 📖 *Full details:* [Goal Loop in docs/features.md](docs/features.md#goal-loop)
 
 ---
 
@@ -85,15 +87,13 @@ pi -e /path/to/pi-focus-guard
 
 ---
 
-### 5. 🎯 Goal Loop — *Keep multi-step work anchored to the end state*
-* **The Problem:** The agent stops after completing one small subtask and hands control back when the broader objective is still incomplete.
-* **The Solution:** A session-scoped goal ($\le 500$ chars) that nudges the agent at the end of every turn: *Is this goal genuinely reached? If not, keep working; if so, release to the user.*
+### 5. 🚫 Commit Guard — *Never commit without human review*
+* **The Problem:** The agent runs `git commit` prematurely before you have reviewed the diff together.
+* **The Solution:** Intercepts `git commit` commands in bash with a cooperative reminder that finishing and review are done collaboratively.
 * **Quick Use:**
-  * Arm & Go: `/focus-goal-start-submit "all unit tests in test/auth pass"`
-  * Arm passively: `/focus-goal-start <def>`
-  * Ask for a proposal: `/focus-goal-suggest`
-  * End goal: `/focus-goal-end`
-* 📖 *Full details:* [Goal Loop in docs/features.md](docs/features.md#goal-loop)
+  * Commands: `/focus-commit-guard-on`, `/focus-commit-guard-off`, `/focus-commit-guard`
+  * Flags: `--commit-guard-on`, `--commit-guard-off`
+* 📖 *Full details:* [Commit Guard in docs/features.md](docs/features.md#commit-guard)
 
 ---
 
@@ -109,15 +109,15 @@ pi -e /path/to/pi-focus-guard
 | `/focus-write-guard <dirs>` | Set write allowlist for the current session (comma/space-separated) |
 | `/focus-write-guard` | Display current write guard policy and allowed directories |
 | `/focus-write-guard-all` | Disable write restrictions for this session |
-| `/focus-commit-guard-on` / `-off` | Toggle commit blocking on/off |
-| `/focus-commit-guard` | Show commit guard status |
-| `/focus-crazy-find-guard-on` / `-off` | Toggle crazy-find blocking on/off |
-| `/focus-crazy-find-guard` | Show crazy-find guard status |
 | `/focus-goal-start <def>` | Arm turn-end goal cross-check without triggering a turn ($\le 500$ chars) |
 | `/focus-goal-start-submit <def>` | Arm goal and immediately submit definition as user prompt to start work |
 | `/focus-goal-suggest` | Ask the agent to propose a single adoptable session goal |
 | `/focus-goal` | Print active goal definition, or state that none is active |
 | `/focus-goal-end` | Disarm and clear active goal without judging completion |
+| `/focus-crazy-find-guard-on` / `-off` | Toggle crazy-find blocking on/off |
+| `/focus-crazy-find-guard` | Show crazy-find guard status |
+| `/focus-commit-guard-on` / `-off` | Toggle commit blocking on/off |
+| `/focus-commit-guard` | Show commit guard status |
 
 ### Startup Flags
 
