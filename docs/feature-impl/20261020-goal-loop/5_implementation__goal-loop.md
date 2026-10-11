@@ -1,6 +1,6 @@
-# goal-loop — implementation notes (v1)
+## goal-loop — implementation notes (v1 + submit variant)
 
-Date: 2026-10-20 · Status: **implemented** · Owner: implementer (handoff)
+Date: 2026-10-20 · Status: **implemented (submit variant added 2026-10-11)** · Owner: implementer (handoff)
 
 ## What was built
 
@@ -9,21 +9,33 @@ Date: 2026-10-20 · Status: **implemented** · Owner: implementer (handoff)
   and the `_resetGoalLoopForTests()` seam.
 - **`src/focus-guard.ts`** — one-line wiring: `registerGoalLoop(pi)` at the end
   of the `focusGuard` entry (see deviation 1). No other changes.
-- **`test/goal-loop.test.ts`** — 16 tests: command registration (focus-goal + full
-  entry), start/end/show handling, 500-char rejection (and boundary acceptance),
-  empty-definition usage message, session-scoped reset on `session_start`,
-  nudge firing on `agent_end` with active goal (verbatim definition,
-  `{ triggerTurn: true, deliverAs: "steer" }`), no nudge without a goal or
-  after `/focus-goal-end`, and the re-entrancy latch behavior.
+- **`test/goal-loop.test.ts`** — 24 tests: command registration (4 commands +
+  full entry), start/start-submit/end/show handling, 500-char rejection (and
+  boundary acceptance), empty-definition usage message, submit routing
+  (idle/busy), pre-submission validation for the submit variant, session-scoped
+  reset on `session_start`, nudge firing on `agent_end` with active goal
+  (verbatim definition, `{ triggerTurn: true, deliverAs: "steer" }`), no nudge
+  without a goal or after `/focus-goal-end`, and the re-entrancy latch behavior.
 - **`test/focus-guard.test.ts`** — the registered-commands assertion now
-  includes `focus-goal`, `focus-goal-end`, `focus-goal-start` (mechanical
-  registry update; the test's own logic unchanged).
+  includes `focus-goal`, `focus-goal-end`, `focus-goal-start`,
+  `focus-goal-start-submit` (mechanical registry update; the test's own logic
+  unchanged).
 
 ## Behavior summary
 
 - `/focus-goal-start <definition>`: plain string, trimmed, ≤500 chars (reject
   with an error message above that), arms the cross-check, sets status `⭕`,
   notifies, and informs the agent (custom message, `triggerTurn: false`).
+  **Passive**: after arming it waits for the user's next prompt.
+- `/focus-goal-start-submit <definition>`: identical validation and arming to
+  `/focus-goal-start` (same `startGoal()` path), **plus** it immediately
+  submits the definition as a user-role message via `pi.sendUserMessage`:
+  idle (`ctx.isIdle()`) → `await pi.sendUserMessage(definition, { expandPromptTemplates: false })`
+  (sent immediately as a new turn); busy →
+  `await pi.sendUserMessage(definition, { deliverAs: "followUp", expandPromptTemplates: false })`
+  (queued as a follow-up). Validation (non-empty, ≤500) runs *before* any
+  submission — a rejected definition neither arms nor sends. `expandPromptTemplates: false`
+  prevents the goal text from being interpreted as template/skill/command syntax.
 - `/focus-goal-end`: disarms and discards, status back to `🎯`.
 - `/focus-goal`: shows the active definition or "No active goal".
 - Status key `a4_goal`, symbols `🎯` (none) / `⭕` (active), same pattern as the
@@ -73,10 +85,18 @@ Date: 2026-10-20 · Status: **implemented** · Owner: implementer (handoff)
 5. Test-only exports (`_resetGoalLoopForTests`) exist because module state
    persists across tests in one file; no production code depends on them.
 
+6. **Submit-variant idle predicate (2026-10-11).** `ctx.isIdle()` **does exist**
+   on the command-handler context in Pi 1.1.0 (`ExtensionContext.isIdle(): boolean`,
+   inherited by `ExtensionCommandContext`), so `/focus-goal-start-submit` uses it
+   directly — no deviation, no SDK equivalent needed. Routing mirrors the
+   sibling's verified `user-pin-submit`: idle → direct send, busy →
+   `deliverAs: "followUp"`; `expandPromptTemplates: false` in both cases.
+   (Session-scoped by design: no persistence, unlike the sibling's appendEntry.)
+
 ## Checks
 
 - `npm run typecheck` — pass.
-- `npm test` — pass (8 files, 190 tests, incl. all pre-existing tests).
+- `npm test` — pass (8 files, 197 tests, incl. all pre-existing tests).
 
 ## Open items (out of v1 scope)
 

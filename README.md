@@ -50,6 +50,7 @@ The intended command shape is:
 /focus-crazy-find-guard-on
 /focus-crazy-find-guard-off
 /focus-goal-start <definition>
+/focus-goal-start-submit <definition>
 /focus-goal-end
 /focus-goal
 ```
@@ -147,6 +148,7 @@ The crazy-find guard does not display a footer icon, keeping the bottom status b
 
 ```text
 /focus-goal-start <definition>
+/focus-goal-start-submit <definition>
 /focus-goal-end
 /focus-goal
 ```
@@ -154,8 +156,11 @@ The crazy-find guard does not display a footer icon, keeping the bottom status b
 A session-scoped goal (a plain string of at most 500 characters, no conventions) describes an end state. While a goal is active, the moment the agent would hand control back to the user, it is nudged to cross-check the goal against the current state and decide: release to the user (genuinely done) or keep working (not done). The nudge carries the goal's own description verbatim and no verdict — the agent judges "done" itself, case by case, against what the goal states (a test that must pass, a plan that must be finished, a file that must exist, ...).
 
 - `/focus-goal-start <definition>` — start the goal and arm the turn-end cross-check (definition is trimmed; over 500 characters is rejected with an error; the agent is informed without starting a turn of its own).
+- `/focus-goal-start-submit <definition>` — the "arm and go" form: identical validation and arming to `/focus-goal-start`, plus it immediately submits the definition as a user-role message that triggers an agent turn.
 - `/focus-goal-end` — disarm and discard the goal without judging whether it was achieved.
 - `/focus-goal` — show the active goal's definition, or report that no goal is active.
+
+**Passive vs. active goal start.** `/focus-goal-start` is passive: it arms the cross-check and waits for your next prompt to kick off work. `/focus-goal-start-submit` is active: after arming the identical goal, it submits the definition text as the user message of a new agent turn, so the agent starts working toward the goal in the same command. Routing is idle-aware: when the session is idle, the message is sent immediately as a new turn; when the agent is busy (streaming), it is queued as a follow-up so it is not lost. In both cases prompt-template expansion is disabled, so the goal text is passed through verbatim. Validation (non-empty, ≤500 characters) runs before any submission — a rejected definition neither arms nor sends.
 
 The goal is session-scoped: it does not persist to a project setting and does not survive a session restart. v1 has no cross-check budget or forced-release cap — at most one nudge per settled agent run while a goal is active, and the agent may release at any point it judges the goal reached. The footer status icon shows at a glance whether a goal is active: `🎯` means no goal, `⭕` means a goal is active.
 

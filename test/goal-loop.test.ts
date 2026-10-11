@@ -18,6 +18,9 @@ function createPiMock() {
       messages.push({ msg, opts });
       return Promise.resolve();
     }),
+    sendUserMessage: vi.fn((content: any, opts: any) => {
+      return Promise.resolve();
+    }),
     on: vi.fn((event: string, handler: Function) => {
       callbacks[event] ??= [];
       callbacks[event].push(handler);
@@ -32,6 +35,7 @@ function createCtx(overrides: Partial<any> = {}) {
   return {
     hasUI: true,
     cwd: "/project",
+    isIdle: vi.fn().mockReturnValue(true),
     ui: {
       notify: vi.fn(),
       setStatus: vi.fn(),
@@ -71,14 +75,20 @@ describe("goal-loop registration", () => {
     registerGoalLoop(pi);
   });
 
-  it("registers the three goal commands", () => {
-    expect([...pi._commands.keys()].sort()).toEqual(["focus-goal", "focus-goal-end", "focus-goal-start"]);
+  it("registers the four goal commands", () => {
+    expect([...pi._commands.keys()].sort()).toEqual([
+      "focus-goal",
+      "focus-goal-end",
+      "focus-goal-start",
+      "focus-goal-start-submit",
+    ]);
   });
 
   it("wires goal commands into the focus-guard entry", () => {
     const fullPi = createPiMock();
     focusGuard(fullPi);
     expect(fullPi._commands.get("focus-goal-start")).toBeDefined();
+    expect(fullPi._commands.get("focus-goal-start-submit")).toBeDefined();
     expect(fullPi._commands.get("focus-goal-end")).toBeDefined();
     expect(fullPi._commands.get("focus-goal")).toBeDefined();
   });
@@ -148,6 +158,76 @@ describe("goal-loop commands", () => {
     await invoke(pi, "focus-goal-start", "a goal");
     await pi._callbacks.session_start[0]({}, createCtx());
     expect(getActiveGoal()).toBeNull();
+  });
+});
+
+describe("goal-loop /focus-goal-start-submit", () => {
+  let pi: any;
+
+  beforeEach(() => {
+    _resetGoalLoopForTests();
+    pi = createPiMock();
+    registerGoalLoop(pi);
+  });
+
+  it("arms identically to /focus-goal-start: active goal set, status set, agent informed", async () => {
+    const ctx = await invoke(pi, "focus-goal-start-submit", "npm test passes and docs are updated");
+
+    expect(getActiveGoal()).toBe("npm test passes and docs are updated");
+    expect(ctx.ui.setStatus).toHaveBeenCalledWith(GOAL_STATUS_KEY, expect.any(String));
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Goal started"), "info");
+    expect(pi._messages.at(-1).msg.content).toContain("Goal started by user for this session");
+  });
+
+  it("when idle: submits the definition via sendUserMessage without deliverAs", async () => {
+    const ctx = createCtx(); // isIdle → true
+    await invoke(pi, "focus-goal-start-submit", "finish the migration", ctx);
+
+    expect(pi.sendUserMessage).toHaveBeenCalledTimes(1);
+    expect(pi.sendUserMessage).toHaveBeenCalledWith("finish the migration", { expandPromptTemplates: false });
+  });
+
+  it("when busy: submits the definition as a followUp", async () => {
+    const ctx = createCtx({ isIdle: vi.fn().mockReturnValue(false) });
+    await invoke(pi, "focus-goal-start-submit", "finish the migration", ctx);
+
+    expect(pi.sendUserMessage).toHaveBeenCalledTimes(1);
+    expect(pi.sendUserMessage).toHaveBeenCalledWith("finish the migration", { deliverAs: "followUp", expandPromptTemplates: false });
+  });
+
+  it("rejects an empty definition with usage help BEFORE any submission", async () => {
+    const ctx = await invoke(pi, "focus-goal-start-submit", "   ");
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Usage: /focus-goal-start-submit"), "warning");
+    expect(getActiveGoal()).toBeNull();
+    expect(pi.sendUserMessage).not.toHaveBeenCalled();
+  });
+
+  it("rejects a definition over 500 characters BEFORE any submission", async () => {
+    const definition = "x".repeat(GOAL_MAX_LENGTH + 1);
+    const ctx = await invoke(pi, "focus-goal-start-submit", definition);
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      `Goal definition is ${definition.length} characters; the maximum is ${GOAL_MAX_LENGTH}. Shorten the goal and retry.`,
+      "error",
+    );
+    expect(getActiveGoal()).toBeNull();
+    expect(pi.sendUserMessage).not.toHaveBeenCalled();
+  });
+
+  it("accepts a definition of exactly 500 characters and submits it", async () => {
+    const definition = "x".repeat(GOAL_MAX_LENGTH);
+    await invoke(pi, "focus-goal-start-submit", definition);
+
+    expect(getActiveGoal()).toBe(definition);
+    expect(pi.sendUserMessage).toHaveBeenCalledWith(definition, { expandPromptTemplates: false });
+  });
+
+  it("regression: /focus-goal-start (passive) does not submit a user message", async () => {
+    await invoke(pi, "focus-goal-start", "finish the migration");
+
+    expect(getActiveGoal()).toBe("finish the migration");
+    expect(pi.sendUserMessage).not.toHaveBeenCalled();
   });
 });
 

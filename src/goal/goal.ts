@@ -31,9 +31,9 @@ export function formatGoalNudge(goal: string): string {
 
 /**
  * Registers the goal-loop feature on the extension API:
- * /focus-goal-start, /focus-goal-end, /focus-goal commands, the footer status indicator, and the
- * agent_end turn-end cross-check nudge. Goal state is session-scoped (module
- * variables, reset on session_start); nothing is persisted to a project setting.
+ * /focus-goal-start, /focus-goal-start-submit, /focus-goal-end, /focus-goal commands, the footer
+ * status indicator, and the agent_end turn-end cross-check nudge. Goal state is session-scoped
+ * (module variables, reset on session_start); nothing is persisted to a project setting.
  */
 export function registerGoalLoop(pi: ExtensionAPI): void {
   pi.on("session_start", (_event, ctx) => {
@@ -89,6 +89,30 @@ export function registerGoalLoop(pi: ExtensionAPI): void {
         return;
       }
       startGoal(definition, ctx);
+    },
+  });
+
+  pi.registerCommand("focus-goal-start-submit", {
+    description: `Start a session-scoped goal AND immediately submit the definition as a user message, triggering an agent turn that starts working toward the goal ("arm and go"). Same definition rules as /focus-goal-start.`,
+    handler: async (args, ctx) => {
+      const definition = (args ?? "").trim();
+      if (!definition) {
+        if (ctx.hasUI) ctx.ui.notify("Usage: /focus-goal-start-submit <definition> (a plain string of at most 500 characters)", "warning");
+        return;
+      }
+      if (definition.length > GOAL_MAX_LENGTH) {
+        if (ctx.hasUI) ctx.ui.notify(`Goal definition is ${definition.length} characters; the maximum is ${GOAL_MAX_LENGTH}. Shorten the goal and retry.`, "error");
+        return;
+      }
+      // Arming is identical to /focus-goal-start; only the post-arm submission differs.
+      startGoal(definition, ctx);
+      // Submit the definition as a user-role message (no template expansion): idle → sent
+      // immediately as a new turn; busy → queued as a follow-up so it is not lost.
+      if (ctx.isIdle()) {
+        await pi.sendUserMessage(definition, { expandPromptTemplates: false });
+      } else {
+        await pi.sendUserMessage(definition, { deliverAs: "followUp", expandPromptTemplates: false });
+      }
     },
   });
 

@@ -1,6 +1,6 @@
 # goal-loop — requirements
 
-Date: 2026-10-20 · Status: **requirements (settled; command naming amended 2026-10-11)** · Owner: Firstmate (user owns requirements)
+Date: 2026-10-20 · Status: **requirements (settled; command naming amended 2026-10-11; submit variant added 2026-10-11)** · Owner: Firstmate (user owns requirements)
 
 > Non-technical, user-facing requirements only. Technical mechanism, hook choice, and
 > guard design live in `3_plan__goal-loop.md`.
@@ -22,8 +22,8 @@ handoff moment and decide: release to the user (genuinely done) or keep going (n
    Three commands (settled by user, 2026-10-20; **amended 2026-10-11: all user commands in
    this repo are `focus-`-prefixed** — see `/focus-write-guard`, `/focus-discuss`,
    `/focus-commit-guard`, `/focus-crazy-find-guard` — so the goal commands carry the same
-   prefix. Distinct top-level names so autocomplete lists all three and the user need not
-   recall a suffix):
+   prefix. Distinct top-level names so autocomplete lists them and the user need not recall
+   a suffix):
    - `/focus-goal-start <definition>` — start the goal; the turn-end cross-check is armed.
      The definition is a simple string of at most 500 characters with no structured
      conventions — the user writes the goal in plain language (see requirement 2a for what
@@ -33,6 +33,12 @@ handoff moment and decide: release to the user (genuinely done) or keep going (n
    - `/focus-goal` — show the current goal (the definition string) and its state (active
      or none).
    An active goal stays in effect across turns until the user runs `/focus-goal-end`.
+   **Four commands** (submit variant added 2026-10-11):
+   - `/focus-goal-start-submit <definition>` — start the goal (identical to
+     `/focus-goal-start`) **and** immediately submit the definition text as a user-role
+     message, triggering an agent turn that starts working toward the goal. This is the
+     "arm and go" form: for when the goal itself is the task to start right now (see
+     requirement 2b for the passive/active distinction).
 2. **The goal description is free text; "done" is defined by it, case by case.** The
    `<definition>` is a plain string — no flags, no syntax, no parsing conventions. Whatever
    makes the goal "complete" (a test that must pass, a plan that must be finished, a file
@@ -42,6 +48,17 @@ handoff moment and decide: release to the user (genuinely done) or keep going (n
    - **2a. What the description may reference** — anything the user wants: a command to run,
      a plan file, a condition, or a combination. The feature does not interpret or validate
      the string; it passes the goal's own description to the cross-check.
+   - **2b. Passive vs. active goal start (submit variant, added 2026-10-11).**
+     `/focus-goal-start` is **passive**: it arms the cross-check and waits for the user's
+     next prompt to kick off work. `/focus-goal-start-submit` is **active**: it arms the
+     cross-check and immediately submits the goal text as the user message of a new agent
+     turn, so the agent starts working toward the goal in the same command. Both start the
+     identical goal (same definition, same ≤500-char limit, same cross-check arming); they
+     differ only in what happens after arming. The submit variant exists to close the gap
+     where the user would otherwise have to type the goal, then type a second prompt (or
+     re-express the goal) to make the agent engage with it — the same friction the sibling
+     `pi-mini-self-org` feature `user-pin-submit` (docs/feature-impl/20261021-user-pin-submit
+     there) closed for user directives.
 3. **Check at the handoff moment.** Just before the agent would return control to the user,
    if a goal is still active, the agent is nudged to cross-check the goal against the current
    state and then decide: come back to the user (done) or continue working (not done).
@@ -70,6 +87,10 @@ handoff moment and decide: release to the user (genuinely done) or keep going (n
 
 - `/focus-goal-start "<def>"` (a plain string, ≤500 chars) starts a session-scoped goal; the
   turn-end cross-check is armed for that goal.
+- `/focus-goal-start-submit "<def>"` starts the identical session-scoped goal AND submits the
+  definition as a user-role message that triggers an agent turn (idle → sent immediately;
+  busy → queued as a follow-up). Validation (≤500 chars, non-empty) applies identically and
+  happens before any submission.
 - With an active goal, at the moment the agent would return control, the agent is nudged to
   cross-check the goal and decides release vs. continue — the feature does not force a
   fixed number of re-checks in v1.
@@ -96,3 +117,11 @@ handoff moment and decide: release to the user (genuinely done) or keep going (n
    `/focus-goal-end`, `/focus-goal`. The original bare names (`/goal-start`, `/goal-end`,
    `/goal`) were a mistake: they break the repo's naming convention and the
    "registers only focus-prefixed user commands" test invariant.
+9. **Submit variant (added, 2026-10-11, user)** — `/focus-goal-start-submit <definition>`
+   adds a fourth command: arm the goal AND submit the definition text as a user-role
+   message that triggers an agent turn. Passive/active semantics per requirement 2b;
+   inspiration: `pi-mini-self-org` `user-pin-submit`
+   (`/Users/cgint/dev-external/pi-mini-self-org/docs/feature-impl/20261021-user-pin-submit/`).
+   Mechanism: `pi.sendUserMessage(text, { expandPromptTemplates: false })` when the session
+   is idle, `{ deliverAs: "followUp" }` when busy (sibling's verified routing; Pi 1.1.0 SDK
+   `sendUserMessage` signature confirmed in this repo).
