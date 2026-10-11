@@ -3,6 +3,29 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 export const GOAL_STATUS_KEY = "a4_goal";
 export const GOAL_MAX_LENGTH = 500;
 
+/**
+ * The fixed prompt emitted to the LLM by /focus-goal-suggest (settled text, user
+ * sign-off 2026-10-11 — docs/feature-impl/20261011-goal-suggest/). It asks the agent
+ * to propose one adoptable goal definition (≤500 chars, single line) plus a rationale.
+ * Exported so tests assert against the exact string the command sends.
+ */
+export const GOAL_SUGGEST_PROMPT = [
+  "[goal-suggest] Propose one session goal for this project that I can adopt with /focus-goal-start.",
+  "",
+  "If you would set a goal that allows you to go far step-by-step — only stopping when you",
+  "clearly need me (the user) for requirements or goal-setting, or when you are SEVERELY blocked, and",
+  "otherwise using your tools, skills, sub-agents, and advisor smartly and wisely to get",
+  "forward — what would that goal be?",
+  "",
+  "Rules for the goal you propose:",
+  "- Keep the goal definition itself light: a short, plain-language end state of at most",
+  "  500 characters (the /focus-goal-start limit) — not a task list.",
+  "- Keep the detail in files, per this repo's documentation standard: write the",
+  "  description, plan, and status down in files, and reference them from the goal.",
+  "- Present exactly one proposed goal definition, on a single line, ready to paste into",
+  "  /focus-goal-start, followed by a short rationale.",
+].join("\n");
+
 const GOAL_SYMBOL_OFF = "🎯";
 const GOAL_SYMBOL_ACTIVE = "⭕";
 
@@ -31,8 +54,8 @@ export function formatGoalNudge(goal: string): string {
 
 /**
  * Registers the goal-loop feature on the extension API:
- * /focus-goal-start, /focus-goal-start-submit, /focus-goal-end, /focus-goal commands, the footer
- * status indicator, and the agent_end turn-end cross-check nudge. Goal state is session-scoped
+ * /focus-goal-start, /focus-goal-start-submit, /focus-goal-suggest, /focus-goal-end, /focus-goal commands,
+ * the footer status indicator, and the agent_end turn-end cross-check nudge. Goal state is session-scoped
  * (module variables, reset on session_start); nothing is persisted to a project setting.
  */
 export function registerGoalLoop(pi: ExtensionAPI): void {
@@ -112,6 +135,22 @@ export function registerGoalLoop(pi: ExtensionAPI): void {
         await pi.sendUserMessage(definition, { expandPromptTemplates: false });
       } else {
         await pi.sendUserMessage(definition, { deliverAs: "followUp", expandPromptTemplates: false });
+      }
+    },
+  });
+
+  pi.registerCommand("focus-goal-suggest", {
+    description: "Ask the agent to propose one session goal (single-line definition, max 500 chars) you can adopt with /focus-goal-start. Takes no arguments.",
+    handler: async (_args, ctx) => {
+      // Suggest only: emit the fixed prompt as a user-role message (no template
+      // expansion) and touch no goal state. Idle → sent immediately as a new turn;
+      // busy → queued as a follow-up so it is not lost (same routing as the submit
+      // variant). The agent's proposal is adopted, if at all, via an explicit
+      // /focus-goal-start or /focus-goal-start-submit by the user.
+      if (ctx.isIdle()) {
+        await pi.sendUserMessage(GOAL_SUGGEST_PROMPT, { expandPromptTemplates: false });
+      } else {
+        await pi.sendUserMessage(GOAL_SUGGEST_PROMPT, { deliverAs: "followUp", expandPromptTemplates: false });
       }
     },
   });

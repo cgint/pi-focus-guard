@@ -85,6 +85,7 @@ describe("focus command surface", () => {
       "focus-goal-end",
       "focus-goal-start",
       "focus-goal-start-submit",
+      "focus-goal-suggest",
       "focus-write-guard",
       "focus-write-guard-all",
     ]);

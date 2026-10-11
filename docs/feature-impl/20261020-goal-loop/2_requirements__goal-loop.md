@@ -33,7 +33,9 @@ handoff moment and decide: release to the user (genuinely done) or keep going (n
    - `/focus-goal` — show the current goal (the definition string) and its state (active
      or none).
    An active goal stays in effect across turns until the user runs `/focus-goal-end`.
-   **Four commands** (submit variant added 2026-10-11):
+   **Four commands** (submit variant added 2026-10-11; a fifth command,
+   `/focus-goal-suggest`, was added later — see
+   `docs/feature-impl/20261011-goal-suggest/`):
    - `/focus-goal-start-submit <definition>` — start the goal (identical to
      `/focus-goal-start`) **and** immediately submit the definition text as a user-role
      message, triggering an agent turn that starts working toward the goal. This is the

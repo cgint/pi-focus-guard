@@ -51,6 +51,7 @@ The intended command shape is:
 /focus-crazy-find-guard-off
 /focus-goal-start <definition>
 /focus-goal-start-submit <definition>
+/focus-goal-suggest
 /focus-goal-end
 /focus-goal
 ```
@@ -149,6 +150,7 @@ The crazy-find guard does not display a footer icon, keeping the bottom status b
 ```text
 /focus-goal-start <definition>
 /focus-goal-start-submit <definition>
+/focus-goal-suggest
 /focus-goal-end
 /focus-goal
 ```
@@ -157,6 +159,7 @@ A session-scoped goal (a plain string of at most 500 characters, no conventions)
 
 - `/focus-goal-start <definition>` — start the goal and arm the turn-end cross-check (definition is trimmed; over 500 characters is rejected with an error; the agent is informed without starting a turn of its own).
 - `/focus-goal-start-submit <definition>` — the "arm and go" form: identical validation and arming to `/focus-goal-start`, plus it immediately submits the definition as a user-role message that triggers an agent turn.
+- `/focus-goal-suggest` — ask the agent to propose one session goal: emits a fixed prompt (user-role message with idle-aware routing, described below) that asks for a single-line definition of at most 500 characters whose detail lives in files per this repo's documentation standard, plus a short rationale. Suggestion only — it never starts or arms a goal; adopt the proposal with `/focus-goal-start` or `/focus-goal-start-submit`.
 - `/focus-goal-end` — disarm and discard the goal without judging whether it was achieved.
 - `/focus-goal` — show the active goal's definition, or report that no goal is active.
 
@@ -198,4 +201,4 @@ Before treating this successor as ready, tests should show parity for retained b
 - commit guard allowing non-commit bash when enabled;
 - commit guard allowing `git commit` when disabled;
 - commit guard footer icon reflecting enabled/disabled state;
-- goal loop: start/end/show commands, 500-character limit, turn-end nudge with the goal verbatim, no nudge without an active goal, and latch re-arm after settle.
+- goal loop: start/submit/suggest/end/show commands, 500-character limit, turn-end nudge with the goal verbatim, no nudge without an active goal, latch re-arm after settle, and idle/busy `sendUserMessage` routing.

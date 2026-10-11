@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import focusGuard from "../src/focus-guard.js";
-import { GOAL_MAX_LENGTH, GOAL_STATUS_KEY, getActiveGoal, registerGoalLoop, _resetGoalLoopForTests } from "../src/goal/goal.js";
+import { GOAL_MAX_LENGTH, GOAL_STATUS_KEY, GOAL_SUGGEST_PROMPT, getActiveGoal, registerGoalLoop, _resetGoalLoopForTests } from "../src/goal/goal.js";
 
 function createPiMock() {
   const commands = new Map<string, { description: string; handler: (args: string, ctx: any) => Promise<void> }>();
@@ -75,12 +75,13 @@ describe("goal-loop registration", () => {
     registerGoalLoop(pi);
   });
 
-  it("registers the four goal commands", () => {
+  it("registers the five goal commands", () => {
     expect([...pi._commands.keys()].sort()).toEqual([
       "focus-goal",
       "focus-goal-end",
       "focus-goal-start",
       "focus-goal-start-submit",
+      "focus-goal-suggest",
     ]);
   });
 
@@ -91,6 +92,7 @@ describe("goal-loop registration", () => {
     expect(fullPi._commands.get("focus-goal-start-submit")).toBeDefined();
     expect(fullPi._commands.get("focus-goal-end")).toBeDefined();
     expect(fullPi._commands.get("focus-goal")).toBeDefined();
+    expect(fullPi._commands.get("focus-goal-suggest")).toBeDefined();
   });
 });
 
@@ -317,5 +319,61 @@ describe("goal-loop turn-end nudge", () => {
 
     const ctxOn = await invoke(pi, "focus-goal-start", "a goal");
     expect(ctxOn.ui.setStatus).toHaveBeenCalledWith(GOAL_STATUS_KEY, "⭕");
+  });
+});
+
+describe("goal-loop /focus-goal-suggest", () => {
+  let pi: any;
+
+  beforeEach(() => {
+    _resetGoalLoopForTests();
+    pi = createPiMock();
+    registerGoalLoop(pi);
+  });
+
+  it("when idle: emits the settled prompt via sendUserMessage without deliverAs", async () => {
+    const ctx = createCtx(); // isIdle → true
+    await invoke(pi, "focus-goal-suggest", "", ctx);
+
+    expect(pi.sendUserMessage).toHaveBeenCalledTimes(1);
+    expect(pi.sendUserMessage).toHaveBeenCalledWith(GOAL_SUGGEST_PROMPT, { expandPromptTemplates: false });
+  });
+
+  it("when busy: queues the prompt as a followUp", async () => {
+    const ctx = createCtx({ isIdle: vi.fn().mockReturnValue(false) });
+    await invoke(pi, "focus-goal-suggest", "", ctx);
+
+    expect(pi.sendUserMessage).toHaveBeenCalledTimes(1);
+    expect(pi.sendUserMessage).toHaveBeenCalledWith(GOAL_SUGGEST_PROMPT, { deliverAs: "followUp", expandPromptTemplates: false });
+  });
+
+  it("ignores any arguments: the prompt is identical regardless of input", async () => {
+    await invoke(pi, "focus-goal-suggest", "arbitrary junk arguments");
+
+    expect(pi.sendUserMessage).toHaveBeenCalledTimes(1);
+    expect(pi.sendUserMessage).toHaveBeenCalledWith(GOAL_SUGGEST_PROMPT, { expandPromptTemplates: false });
+  });
+
+  it("prompt content pins the settled contract: user stop-triggers, repo-agnostic standard, 500-char limit", () => {
+    expect(GOAL_SUGGEST_PROMPT).toContain("need me (the user) for requirements or goal-setting");
+    expect(GOAL_SUGGEST_PROMPT).toContain("SEVERELY blocked");
+    expect(GOAL_SUGGEST_PROMPT).toContain("this repo's documentation standard");
+    expect(GOAL_SUGGEST_PROMPT).toContain("500 characters");
+    expect(GOAL_SUGGEST_PROMPT).toContain("/focus-goal-start");
+    // Repo-agnostic on purpose: no hard-coded docs/feature-impl path in the emitted prompt.
+    expect(GOAL_SUGGEST_PROMPT).not.toContain("docs/feature-impl");
+  });
+
+  it("suggest-only: no goal state, no cross-check arming, no custom-type message", async () => {
+    const ctx = await invoke(pi, "focus-goal-suggest");
+
+    expect(getActiveGoal()).toBeNull();
+    expect(pi.sendMessage).not.toHaveBeenCalled();
+    expect(ctx.ui.setStatus).not.toHaveBeenCalled();
+
+    // With nothing armed, agent_end must not nudge.
+    pi.sendMessage.mockClear();
+    await agentEnd(pi);
+    expect(pi.sendMessage).not.toHaveBeenCalled();
   });
 });
