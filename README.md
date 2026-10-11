@@ -1,53 +1,96 @@
 # pi-focus-guard
 
-Unified focus-related guard rails and collaboration controls for Pi under one clear `/focus-*` command family.
+**Focus controls and semantic guard rails for Pi under one clear `/focus-*` command family.**
 
-`pi-focus-guard` groups mode switching, filesystem boundaries, execution safeguards, and autonomous goal tracking into a single cohesive extension. Instead of cold security blockades, focus controls act as **semantic collaboration signals** that explain *why* boundaries exist, building mutual situational awareness between user and agent.
-
-For our philosophy on agentic agency, boundaries as collaboration signals, and pairing discipline, see [`docs/philosophy-and-north-star.md`](docs/philosophy-and-north-star.md).
-
-For deep behavioral specifications, AST detection mechanics, and configuration hierarchies, see [`docs/features.md`](docs/features.md).
+When pairing with an AI agent, you don't need a cold, silent sandbox — you need shared situational awareness. `pi-focus-guard` gives you conversational, phase-aware guard rails that communicate *why* boundaries exist so the agent cooperates rather than routing around them.
 
 ---
 
-## Feature Groups
+## The Collaboration Lifecycle
 
-### 🛡️ Write Guard
-* **Goal & Intent:** Keep filesystem modifications confined to explicit, approved directories.
-* **Why it matters:** Prevents agents from modifying files outside active task boundaries or writing across unrelated directories. Writes via `write`, `edit`, and shell redirections/mutations in `bash` are validated against the allowlist.
-* **Key Commands:** `/focus-write-guard <dirs>`, `/focus-write-guard`, `/focus-write-guard-all`
-* **Startup Flags:** `--write-guard <dirs>`, `--write-guard-all`, `--write-guard-off`
-* 📖 *Full details:* [Write Guard in docs/features.md](docs/features.md#write-guard)
+`pi-focus-guard` aligns your agent to your current working phase:
 
-### 💬 Discuss Mode
-* **Goal & Intent:** Explicitly control when the agent may execute actions versus when it should step back to discuss or investigate.
-* **Why it matters:** Prevents eager execution before ideas are clear. Supports three distinct collaboration modes:
+```text
+ 1. DISCUSS & INVESTIGATE         2. ACT & BUILD                   3. REVIEW & FINISH
+ ─────────────────────────        ──────────────────────           ───────────────────
+ "Let's align before acting"      "Stay focused on the goal"       "We finish together"
+
+ • Discuss Mode (block / read)    • Write Guard (scoped paths)     • Commit Guard
+ • Inline directives (-dr:, -db:) • Crazy-Find Guard (no runaway)  • Collaborative git diff
+                                  • Goal Loop (turn-end nudge)
+```
+
+---
+
+## Installation
+
+Add to your Pi extensions or install via Pi CLI:
+
+```bash
+# Install via Pi CLI
+pi install git:github.com/cgint/pi-focus-guard
+
+# Or run directly on demand
+pi -e /path/to/pi-focus-guard
+```
+
+---
+
+## The 5 Focus Controls
+
+### 1. 💬 Discuss Mode — *Stop premature coding; investigate first*
+* **The Problem:** The agent starts rewriting files before you've agreed on architecture, or you just want to investigate without altering code.
+* **The Solution:** Three clear modes:
   * `off`: Normal execution.
-  * `block`: Strictly steps back from all tools to discuss architecture, ideas, and trade-offs.
-  * `read`: Permits non-mutating inspection (read-only `bash`, inspection tools, subagents, and advisors) while blocking all `write` and `edit` calls.
-* **Key Commands:** `/focus-discuss off|block|read`, `/focus-discuss-off`, `/focus-discuss-block`, `/focus-discuss-read`
-* **Startup Flags:** `--dm-off`, `--dm-block`, `--dm-read`
-* **Inline Directives:** `-do:`, `-db:`, `-dr:` (switch mode directly inside a prompt)
+  * `block`: Strictly steps back from all tools to discuss concepts and trade-offs.
+  * `read`: Lets the agent inspect freely (read-only bash, web search, subagents, inspection tools) while strictly blocking `write` and `edit`.
+* **Quick Use:**
+  * Commands: `/focus-discuss read`, `/focus-discuss block`, `/focus-discuss off`
+  * Inline in prompt: `-dr: investigate the failing test` *(read-only)* or `-db: plan the refactor` *(block)*
+  * Flags: `--dm-read`, `--dm-block`, `--dm-off`
 * 📖 *Full details:* [Discuss Mode in docs/features.md](docs/features.md#discuss-mode)
 
-### 🚫 Commit Guard
-* **Goal & Intent:** Prevent premature git commits until collaborative review is finished.
-* **Why it matters:** Keeps the agent from unilaterally committing changes while the user is still reviewing diffs, verifying edge cases, and deciding on milestones.
-* **Key Commands:** `/focus-commit-guard`, `/focus-commit-guard-on`, `/focus-commit-guard-off`
-* **Startup Flags:** `--commit-guard`, `--commit-guard-on`, `--commit-guard-off`
+---
+
+### 2. 🛡️ Write Guard — *Keep writes inside approved directories*
+* **The Problem:** The agent strays outside the task scope, editing config files, dependencies, or unrelated folders.
+* **The Solution:** Restricts all filesystem modifications (`write`, `edit`, and shell redirections/mutations in `bash`) to an approved allowlist. Denials explain the boundary so the agent asks rather than hacking around it.
+* **Quick Use:**
+  * Commands: `/focus-write-guard src/auth,test/auth`, `/focus-write-guard all`
+  * Flags: `--write-guard src/auth,test/auth`, `--write-guard-all`
+  * Config: Define `allowedDirs` in `.pi/settings.json`
+* 📖 *Full details:* [Write Guard in docs/features.md](docs/features.md#write-guard)
+
+---
+
+### 3. 🚫 Commit Guard — *Never commit without human review*
+* **The Problem:** The agent runs `git commit` prematurely before you have reviewed the diff together.
+* **The Solution:** Intercepts `git commit` commands in bash with a cooperative reminder that finishing and review are done collaboratively.
+* **Quick Use:**
+  * Commands: `/focus-commit-guard-on`, `/focus-commit-guard-off`, `/focus-commit-guard`
+  * Flags: `--commit-guard-on`, `--commit-guard-off`
 * 📖 *Full details:* [Commit Guard in docs/features.md](docs/features.md#commit-guard)
 
-### 🧭 Crazy-Find Guard
-* **Goal & Intent:** Shield the session from runaway filesystem scans rooted at `/` or user home (`~`).
-* **Why it matters:** AI agents frequently launch unbounded `find /` or `find ~` commands that freeze sessions, hit permissions walls, or scan giant external volumes. Enabled by default, while project-scoped searches (e.g. `find .`, `find ./src`, `find ~/dev/repo`) remain completely unrestricted.
-* **Key Commands:** `/focus-crazy-find-guard`, `/focus-crazy-find-guard-on`, `/focus-crazy-find-guard-off`
-* **Startup Flags:** `--crazy-find-guard`, `--crazy-find-guard-on`, `--crazy-find-guard-off`
+---
+
+### 4. 🧭 Crazy-Find Guard — *Block runaway root and home searches*
+* **The Problem:** The agent runs `find /` or `find ~` looking for a file, hanging the session, scanning external volumes, or hitting permission walls.
+* **The Solution:** Enabled by default. AST inspection blocks unrestricted sweeps at `/` and `~` while keeping project-scoped searches (e.g. `find .`, `find ./src`, `find ~/dev/repo`) completely unaffected.
+* **Quick Use:**
+  * Commands: `/focus-crazy-find-guard-on`, `/focus-crazy-find-guard-off`
+  * Flags: `--crazy-find-guard-off` *(opt-out)*
 * 📖 *Full details:* [Crazy-Find Guard in docs/features.md](docs/features.md#crazy-find-guard)
 
-### 🎯 Goal Loop
-* **Goal & Intent:** Anchor multi-turn agent work to a clear session goal via turn-end cross-checking.
-* **Why it matters:** Instead of stopping after a single preliminary step, an active session goal nudges the agent at the end of each turn to self-evaluate: *Is this goal genuinely reached? If not, keep working; if it is, release to the user.*
-* **Key Commands:** `/focus-goal-start <def>`, `/focus-goal-start-submit <def>`, `/focus-goal-suggest`, `/focus-goal`, `/focus-goal-end`
+---
+
+### 5. 🎯 Goal Loop — *Keep multi-step work anchored to the end state*
+* **The Problem:** The agent stops after completing one small subtask and hands control back when the broader objective is still incomplete.
+* **The Solution:** A session-scoped goal ($\le 500$ chars) that nudges the agent at the end of every turn: *Is this goal genuinely reached? If not, keep working; if so, release to the user.*
+* **Quick Use:**
+  * Arm & Go: `/focus-goal-start-submit "all unit tests in test/auth pass"`
+  * Arm passively: `/focus-goal-start <def>`
+  * Ask for a proposal: `/focus-goal-suggest`
+  * End goal: `/focus-goal-end`
 * 📖 *Full details:* [Goal Loop in docs/features.md](docs/features.md#goal-loop)
 
 ---
@@ -58,21 +101,17 @@ For deep behavioral specifications, AST detection mechanics, and configuration h
 
 | Command | Description |
 | :--- | :--- |
+| `/focus-discuss off\|block\|read` | Switch discuss mode (`off`, `block`, or `read`) |
+| `/focus-discuss-off` / `-read` / `-block` | Quick shortcuts to switch discuss modes |
+| `/focus-discuss` | Display active discuss mode status |
 | `/focus-write-guard <dirs>` | Set write allowlist for the current session (comma/space-separated) |
 | `/focus-write-guard` | Display current write guard policy and allowed directories |
 | `/focus-write-guard-all` | Disable write restrictions for this session |
-| `/focus-discuss off\|block\|read` | Switch discuss mode (`off`, `block`, or `read`) |
-| `/focus-discuss` | Display active discuss mode status |
-| `/focus-discuss-off` | Disable discuss mode (allow all tools) |
-| `/focus-discuss-block` | Block all tool calls (conceptual alignment) |
-| `/focus-discuss-read` | Enter read-only mode (allow inspection tools & read-only bash) |
+| `/focus-commit-guard-on` / `-off` | Toggle commit blocking on/off |
 | `/focus-commit-guard` | Show commit guard status |
-| `/focus-commit-guard-on` | Block `git commit` commands until review is complete |
-| `/focus-commit-guard-off` | Allow `git commit` commands again |
+| `/focus-crazy-find-guard-on` / `-off` | Toggle crazy-find blocking on/off |
 | `/focus-crazy-find-guard` | Show crazy-find guard status |
-| `/focus-crazy-find-guard-on` | Enable crazy-find guard (block `find /` and `find ~`) |
-| `/focus-crazy-find-guard-off` | Disable crazy-find guard (allow unrestricted finds) |
-| `/focus-goal-start <def>` | Arm turn-end goal cross-check without triggering an agent turn ($\le 500$ chars) |
+| `/focus-goal-start <def>` | Arm turn-end goal cross-check without triggering a turn ($\le 500$ chars) |
 | `/focus-goal-start-submit <def>` | Arm goal and immediately submit definition as user prompt to start work |
 | `/focus-goal-suggest` | Ask the agent to propose a single adoptable session goal |
 | `/focus-goal` | Print active goal definition, or state that none is active |
@@ -82,26 +121,22 @@ For deep behavioral specifications, AST detection mechanics, and configuration h
 
 | Flag | Description |
 | :--- | :--- |
+| `--dm-read` / `--dm-block` / `--dm-off` | Start session in discuss read-only, block, or off mode |
 | `--write-guard <dirs>` | Start session with write allowlist set to comma-separated directories |
-| `--write-guard-all` / `--write-guard-off` | Start session with write guard disabled (overrides persisted state) |
-| `--dm-off` | Start session with discuss mode disabled (overrides persisted state) |
-| `--dm-block` | Start session in discuss block mode (all tools blocked) |
-| `--dm-read` | Start session in discuss read-only mode (inspection tools only) |
-| `--commit-guard` / `--commit-guard-on` | Start session with commit guard enabled |
-| `--commit-guard-off` | Start session with commit guard disabled |
-| `--crazy-find-guard` / `--crazy-find-guard-on` | Start session with crazy-find guard enabled (default) |
-| `--crazy-find-guard-off` | Start session with crazy-find guard disabled |
+| `--write-guard-all` / `--write-guard-off` | Start session with write guard disabled |
+| `--commit-guard-on` / `--commit-guard-off` | Start session with commit guard enabled or disabled |
+| `--crazy-find-guard-off` | Start session with crazy-find guard disabled (defaults to ON) |
 
 *Precedence:* Explicit `off` flags override on/read/block flags and persisted state for their respective guard.
 
 ### Inline Discuss Directives
 
-Discuss mode can be changed inline when submitting a request:
-* `-do: <message>` — Disable discuss mode and process message.
-* `-db: <message>` — Set discuss mode to block and process message.
-* `-dr: <message>` — Set discuss mode to read-only and process message.
+Switch mode directly inside any user message:
+* `-dr: <message>` — Read-only mode: investigate without editing.
+* `-db: <message>` — Block mode: discuss concepts without tools.
+* `-do: <message>` — Off mode: resume normal tool execution.
 
-Can be placed at the start or end of the prompt (e.g. `-dr: check why tests fail`). A directive-only message changes the mode without starting an agent turn. Follow-up queued directives activate when their turn begins.
+*Example:* `-dr: investigate why authentication fails on refresh`
 
 ### Status Bar Icon Legend
 
@@ -118,14 +153,13 @@ Can be placed at the start or end of the prompt (e.g. `-dr: check why tests fail
 | **Commit Guard** | `📝` | Commit guard is **OFF** (`git commit` allowed) |
 | | `🚫` | Commit guard is **ON** (`git commit` blocked) |
 | **Crazy-Find Guard**| *(none)* | *(No icon to keep status bar uncluttered; defaults to ON)* |
-| **Goal Loop** | `🎯` | Goal is active (turn-end nudge armed) |
+| **Goal Loop** | `🎯` | Goal is active (turn-end cross-check armed) |
 | | *(cleared)*| No active goal |
 
 ---
 
-## Documentation
+## Further Reading
 
-* [`docs/features.md`](docs/features.md) — Comprehensive feature specifications, AST analysis, configuration precedence, and lifecycle invariants.
-* [`docs/philosophy-and-north-star.md`](docs/philosophy-and-north-star.md) — Human-agent pairing principles and semantic collaboration signals.
-* [`docs/parity-matrix.md`](docs/parity-matrix.md) — Legacy migration parity and verification records.
-* [`docs/feature-impl/`](docs/feature-impl/) — Design docs, spikes, and implementation plans per feature.
+* [`docs/features.md`](docs/features.md) — Exhaustive technical reference (AST detection, config hierarchy, fail-fast rules, lifecycle invariants).
+* [`docs/philosophy-and-north-star.md`](docs/philosophy-and-north-star.md) — The pairing philosophy: boundaries as collaboration signals, not cold blocks.
+* [`docs/parity-matrix.md`](docs/parity-matrix.md) — Parity matrix with predecessor extensions (`pi-write-guard`, `pi-discuss-mode`).
