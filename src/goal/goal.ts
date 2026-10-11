@@ -46,8 +46,15 @@ export function getActiveGoal(): string | null {
 export function formatGoalNudge(goal: string): string {
   return (
     `[goal-reminder] active goal: "${goal}"\n` +
-    `  → cross-check: is this goal genuinely reached? if not, keep working;\n` +
-    `  if it is, release to the user. (extension nudge, not user input)`
+    `  → cross-check at turn end:\n` +
+    `  1. What specific observable condition proves this goal is done?\n` +
+    `  2. Does current session evidence (test result, command output, file content) confirm it exists now?\n` +
+    `  3. If you can name a next step you can execute, execute it. Naming it is not finishing it. Continue with your tools, skills, subagents, and advisor — forward, honest progress, no hacks, no workarounds.\n` +
+    `  4. Release to the user only if:\n` +
+    `     a) the goal's end state is proven reached, or\n` +
+    `     b) you are genuinely blocked on a decision only the user can make — name it.\n` +
+    `  A progress report, status summary, or "here's what remains" is not a valid reason to stop.\n` +
+    `  (extension nudge, not user input)`
   );
 }
 

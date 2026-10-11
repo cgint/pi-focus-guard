@@ -115,14 +115,13 @@ handoff moment and decide: release to the user (genuinely done) or keep going (n
    criterion.
 5. **Check-script robustness** — out of scope for this feature (the feature does not run or
    manage check scripts; that is the agent's / user's business).
-6. **Directory naming** — `20261020-goal-loop` (renamed from the erroneous `20260715`).
-7. **`/focus-goal-start` grammar** — a simple string, no conventions, max 500 characters.
-8. **Command naming (amendment, 2026-10-11, user)** — all user commands in this repo are
+6. **`/focus-goal-start` grammar** — a simple string, no conventions, max 500 characters.
+7. **Command naming (amendment, 2026-10-11, user)** — all user commands in this repo are
    `focus-`-prefixed; the goal commands are therefore `/focus-goal-start`,
    `/focus-goal-end`, `/focus-goal`. The original bare names (`/goal-start`, `/goal-end`,
    `/goal`) were a mistake: they break the repo's naming convention and the
    "registers only focus-prefixed user commands" test invariant.
-9. **Submit variant (added, 2026-10-11, user)** — `/focus-goal-start-submit <definition>`
+8. **Submit variant (added, 2026-10-11, user)** — `/focus-goal-start-submit <definition>`
    adds a fourth command: arm the goal AND submit the definition text as a user-role
    message that triggers an agent turn. Passive/active semantics per requirement 2b;
    inspiration: `pi-mini-self-org` `user-pin-submit`

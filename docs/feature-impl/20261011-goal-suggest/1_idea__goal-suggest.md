@@ -2,7 +2,7 @@
 
 Date: 2026-10-11 · Status: **idea** · Owner: Firstmate (user owns requirements)
 
-> Companion feature to `docs/feature-impl/20261020-goal-loop/` (same repo, same goal
+> Companion feature to `docs/feature-impl/20261011-goal-loop/` (same repo, same goal
 > subsystem). User-facing requirements in `2_requirements__goal-suggest.md`.
 
 ## Problem

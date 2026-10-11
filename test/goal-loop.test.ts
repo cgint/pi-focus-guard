@@ -299,6 +299,8 @@ describe("goal-loop turn-end nudge", () => {
     for (const nudge of nudges) {
       expect(nudge.msg.content).toContain('"a goal"');
       expect(nudge.msg.content).toContain("cross-check");
+      expect(nudge.msg.content).toContain("Naming it is not finishing it");
+      expect(nudge.msg.content).toContain("not a valid reason to stop");
       expect(nudge.opts).toEqual({ triggerTurn: true, deliverAs: "steer" });
     }
   });

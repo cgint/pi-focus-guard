@@ -3,7 +3,7 @@
 Date: 2026-10-11 · Status: **requirements (settled; prompt wording signed off by the user, 2026-10-11)** · Owner: Firstmate (user owns requirements)
 
 > Non-technical, user-facing requirements only. Home repo: **pi-focus-guard** (same as
-> `docs/feature-impl/20261020-goal-loop/`, whose `/focus-goal-start` rules this feature
+> `docs/feature-impl/20261011-goal-loop/`, whose `/focus-goal-start` rules this feature
 > must respect).
 
 ## Problem
