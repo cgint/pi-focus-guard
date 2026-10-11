@@ -51,7 +51,7 @@ Every `/focus-*` command registered by the extension:
 | `/focus-discuss-block` | Discuss | Block all tool calls (conceptual alignment) |
 | `/focus-write-guard <dirs>` | Write | Set write allowlist for current session (comma/space-separated) |
 | `/focus-write-guard` | Write | Display current write guard policy and allowed directories |
-| `/focus-write-guard all` / `-all` | Write | Disable write restrictions for this session |
+| `/focus-write-guard-all` | Write | Disable write restrictions for this session |
 | `/focus-goal-start <def>` | Goal | Arm turn-end goal cross-check without triggering a turn ($\le 500$ chars) |
 | `/focus-goal-start-submit <def>` | Goal | Arm goal and immediately submit definition as user prompt to start work |
 | `/focus-goal-suggest` | Goal | Ask the agent to propose a single adoptable session goal |

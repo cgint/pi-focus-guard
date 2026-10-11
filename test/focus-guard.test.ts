@@ -433,6 +433,41 @@ describe("write guard parity", () => {
     );
     expect(result).toBeUndefined();
   });
+
+  it("treats 'all' as a literal directory token, not a disable shortcut", async () => {
+    const ctx = await invoke(pi, "focus-write-guard", "all", createCtx({ cwd: "/project" }));
+
+    // 'all' must now be persisted as a real directory, not as a session(off) override.
+    expect(pi.appendEntry).toHaveBeenCalledWith("write-guard", { mode: "allow", dirs: ["all"] });
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining("- /project/all"),
+      "info",
+    );
+
+    // A write under <cwd>/all is allowed; a write outside is still blocked.
+    const toolCall = pi._callbacks.tool_call[0];
+    await expect(toolCall(
+      { toolName: "write", input: { path: "/project/all/file.txt", content: "data" } },
+      createCtx({ cwd: "/project" }),
+    )).resolves.toBeUndefined();
+    const denied = await toolCall(
+      { toolName: "write", input: { path: "/outside/file.txt", content: "data" } },
+      createCtx({ cwd: "/project" }),
+    );
+    expect(denied).toEqual(expect.objectContaining({ block: true }));
+  });
+
+  it("/focus-write-guard-all still disables the guard", async () => {
+    await invoke(pi, "focus-write-guard-all", "", createCtx({ cwd: "/project" }));
+
+    expect(pi.appendEntry).toHaveBeenCalledWith("write-guard", { mode: "off" });
+    // With the guard off, a write outside any allowlist is no longer blocked.
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "write", input: { path: "/outside/file.txt", content: "data" } },
+      createCtx({ cwd: "/project" }),
+    );
+    expect(result).toBeUndefined();
+  });
 });
 
 describe("discuss mode parity", () => {

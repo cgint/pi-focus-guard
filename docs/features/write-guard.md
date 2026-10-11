@@ -12,7 +12,7 @@ Write guard controls where filesystem modifications may occur during an agent tu
 | :--- | :--- |
 | `/focus-write-guard <dirs>` | Set the session allowlist (comma- or space-separated paths, relative to cwd or absolute) |
 | `/focus-write-guard` | Display the active write policy and resolved directories |
-| `/focus-write-guard all` / `-all` | Disable write restrictions for the active session |
+| `/focus-write-guard-all` | Disable write restrictions for the active session |
 | `--write-guard <dirs>` | Startup flag setting the initial allowlist |
 | `--write-guard-all` / `--write-guard-off` | Startup flag disabling write restrictions (overrides persisted state) |
 
@@ -22,7 +22,7 @@ Write guard controls where filesystem modifications may occur during an agent tu
 
 The effective policy is evaluated at session start or whenever a command updates session state:
 1. **Explicit startup flag `--write-guard-off` / `--write-guard-all`:** Disables enforcement immediately (`source: session(off)`).
-2. **Session override:** Set via `/focus-write-guard <dirs>` (`source: session`) or `/focus-write-guard all` (`source: session(off)`).
+2. **Session override:** Set via `/focus-write-guard <dirs>` (`source: session`) or disabled via `/focus-write-guard-all` (`source: session(off)`).
 3. **Startup flag `--write-guard <dirs>`:** Validated on startup (`source: flag`).
 4. **Environment variable `PI_WRITE_GUARD_DIRS`:** Comma-separated list (`source: env`).
 5. **Project configuration `.pi/settings.json`:** Reads `allowedDirs` from keys `piWriteGuard`, `piWritePermit`, `writePolicy`, or legacy `writeAllowDirs` (`source: settings`).

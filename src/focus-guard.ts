@@ -291,21 +291,6 @@ export default function focusGuard(pi: ExtensionAPI) {
         return;
       }
 
-      const lower = argsTrimmed.toLowerCase();
-      if (lower === "all") {
-        writeSessionOverride = { mode: "off" };
-        activeWritePolicy = { enforce: false, source: "session(off)", dirs: null };
-        persistWriteOverride();
-        await updateWriteStatus(ctx);
-        if (ctx.hasUI) {
-          ctx.ui.notify("Write guard disabled — no write restrictions for this session.", "info");
-          await pi.sendMessage(
-            { customType: WRITE_PERSIST_TYPE, content: "Write guard disabled — no write restrictions for this session.", display: true },
-            { triggerTurn: false },
-          );
-        }
-        return;
-      }
       const dirs = parseDirsArgList(argsTrimmed);
       try {
         writeSessionOverride = { mode: "allow", dirs: requireNonEmptyDirs(dirs, "command") };

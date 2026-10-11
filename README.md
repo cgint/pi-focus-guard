@@ -58,7 +58,7 @@ pi -e /path/to/pi-focus-guard
 * **The Problem:** The agent strays outside the task scope, editing config files, dependencies, or unrelated folders.
 * **The Solution:** Restricts all filesystem modifications (`write`, `edit`, and shell redirections/mutations in `bash`) to an approved allowlist. Denials explain the boundary so the agent asks rather than hacking around it.
 * **Quick Use:**
-  * Commands: `/focus-write-guard src/auth,test/auth`, `/focus-write-guard all`
+  * Commands: `/focus-write-guard src/auth,test/auth` · disable: `/focus-write-guard-all`
   * Flags: `--write-guard src/auth,test/auth`, `--write-guard-all`
   * Config: Define `allowedDirs` in `.pi/settings.json`
 * 📖 *Full details:* [Write Guard in docs/features/write-guard.md](docs/features/write-guard.md)
@@ -106,7 +106,7 @@ The core interactive controls for each phase of pairing:
 | Guard Rail | Primary Command | Startup Flag | Footer Icon | Details |
 | :--- | :--- | :--- | :---: | :---: |
 | **💬 Discuss Mode** | `/focus-discuss read\|block\|off` *(or `-dr:`, `-db:`, `-do:`)* | `--dm-read`, `--dm-block` | `📖` `🔒` `✅` | [Spec](docs/features/discuss-mode.md) |
-| **🛡️ Write Guard** | `/focus-write-guard <dirs>` *(or `all`)* | `--write-guard <dirs>` | `🛡️` `🔰` `✍️` | [Spec](docs/features/write-guard.md) |
+| **🛡️ Write Guard** | `/focus-write-guard <dirs>` *(disable: `/focus-write-guard-all`)* | `--write-guard <dirs>` | `🛡️` `🔰` `✍️` | [Spec](docs/features/write-guard.md) |
 | **🎯 Goal Loop** | `/focus-goal-start-submit <def>` | *(session-scoped)* | `🎯` | [Spec](docs/features/goal-loop.md) |
 | **🧭 Crazy-Find Guard**| `/focus-crazy-find-guard-off` | `--crazy-find-guard-off` | *(none)* | [Spec](docs/features/crazy-find-guard.md) |
 | **🚫 Commit Guard** | `/focus-commit-guard-on` / `-off` | `--commit-guard-on` | `🚫` `📝` | [Spec](docs/features/commit-guard.md) |
