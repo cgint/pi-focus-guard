@@ -72,6 +72,57 @@ export function parseDirsArgList(args: string): string[] {
 	return args.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
 }
 
+export type IncrementalOp = { kind: "add" | "remove"; dir: string };
+
+export function parseIncrementalOps(args: string): IncrementalOp[] | null {
+	const tokens = parseDirsArgList(args);
+	if (tokens.length === 0) return null;
+	const hasPrefix = tokens.some((t) => t.startsWith("+") || t.startsWith("-"));
+	if (!hasPrefix) return null;
+	return tokens.map((t) => {
+		if (t.startsWith("+")) {
+			if (t.length === 1) throw new WriteGuardConfigError("command", "the \"+\" token needs a directory after it, e.g. +docs.");
+			return { kind: "add" as const, dir: t.slice(1) };
+		}
+		if (t.startsWith("-")) {
+			if (t.length === 1) throw new WriteGuardConfigError("command", "the \"-\" token needs a directory after it, e.g. -docs.");
+			return { kind: "remove" as const, dir: t.slice(1) };
+		}
+		throw new WriteGuardConfigError("command", "incremental edit mode (+dir / -dir) cannot be mixed with plain directory tokens: \"" + t + "\".");
+	});
+}
+
+export async function applyIncrementalOps(
+	baseDirs: string[],
+	ops: IncrementalOp[],
+	cwd: string,
+): Promise<{ dirs: string[]; removedMissing: string[] }> {
+	const canonicalize = (d: string) => realpathIfExists(resolveMaybeRelative(d, cwd));
+	let dirs = [...baseDirs];
+	const removedMissing: string[] = [];
+	for (const op of ops) {
+		const dir = op.dir;
+		const canonical = await canonicalize(dir);
+		if (op.kind === "add") {
+			let alreadyPresent = false;
+			for (const d of dirs) {
+				if (await canonicalize(d) === canonical) { alreadyPresent = true; break; }
+			}
+			if (!alreadyPresent) dirs.push(dir);
+		} else {
+			const kept: string[] = [];
+			let matched = false;
+			for (const d of dirs) {
+				if (await canonicalize(d) === canonical) { matched = true; continue; }
+				kept.push(d);
+			}
+			dirs = matched ? kept : dirs;
+			if (!matched) removedMissing.push(dir);
+		}
+	}
+	return { dirs, removedMissing };
+}
+
 export function formatResolvedList(resolvedDirs: string[]): string {
 	return resolvedDirs.length > 0 ? resolvedDirs.map((d) => `- ${d}`).join("\n") : "(none)";
 }

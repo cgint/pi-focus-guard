@@ -11,10 +11,23 @@ Write guard controls where filesystem modifications may occur during an agent tu
 | Command / Flag | Description |
 | :--- | :--- |
 | `/focus-write-guard <dirs>` | Set the session allowlist (comma- or space-separated paths, relative to cwd or absolute) |
+| `/focus-write-guard +<dir> [-<dir> …]` | Incrementally add (`+`) and/or remove (`-`) directories from the active allowlist; see [Incremental edit](#incremental-edit) |
 | `/focus-write-guard` | Display the active write policy and resolved directories |
 | `/focus-write-guard-all` | Disable write restrictions for the active session |
 | `--write-guard <dirs>` | Startup flag setting the initial allowlist |
 | `--write-guard-all` / `--write-guard-off` | Startup flag disabling write restrictions (overrides persisted state) |
+
+---
+
+## Incremental edit
+
+Any token prefixed with `+` or `-` switches `/focus-write-guard` to **edit mode**: instead of replacing the whole list, adds/removes are applied left-to-right to the currently effective allowlist (whatever source is active). Plain, unprefixed tokens always mean **set mode** (replace the whole list) — mixing the two is rejected as ambiguous, and a bare `+`/`-` with no directory is an error.
+
+* **`+<dir>`** adds the directory; duplicates (by resolved path) are no-ops. Adding while the guard is off turns the guard on with the added dir(s).
+* **`-<dir>`** removes the directory, matching by resolved path (so `-docs`, `-./docs`, and `-docs/` all remove a stored `./docs`). Removing a dir that is not in the list is a no-op with a notice naming the dir.
+* **Removing the last remaining directory is disallowed**: the list is left unchanged and a warning is shown pointing to the two exits — `/focus-write-guard-all` (disable) or `/focus-write-guard <dirs>` (set a new non-empty list). An empty allowlist is not a valid state in this codebase.
+* The result is stored as a session override and persists across session restart, exactly like set mode.
+* Known limitation: there is no way to add or remove a directory whose name itself starts with `-`.
 
 ---
 

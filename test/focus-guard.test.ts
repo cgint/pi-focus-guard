@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { promises as fsPromises } from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import focusGuard, {
   COMMIT_GUARD_STATUS_KEY,
   formatCommitGuardBlockedReason,
@@ -944,5 +947,155 @@ describe("crazy-find guard", () => {
       createCtx(),
     );
     expect(result).toBeUndefined();
+  });
+});
+
+describe("write guard incremental edit (+/-)", () => {
+  let pi: any;
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    pi = createPiMock();
+    focusGuard(pi);
+    tmpDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "pi-focus-incremental-cmd-"));
+    await fsPromises.mkdir(path.join(tmpDir, "src"), { recursive: true });
+    await fsPromises.mkdir(path.join(tmpDir, "test"), { recursive: true });
+  });
+
+  afterEach(async () => {
+    try {
+      await fsPromises.rm(tmpDir, { recursive: true, force: true });
+    }
+    catch {
+      // ignore
+    }
+  });
+
+  it("+dir appends to the active allowlist", async () => {
+    await invoke(pi, "focus-write-guard", "src", createCtx({ cwd: tmpDir }));
+    const ctx = await invoke(pi, "focus-write-guard", "+test", createCtx({ cwd: tmpDir }));
+
+    expect(pi.appendEntry).toHaveBeenCalledWith("write-guard", { mode: "allow", dirs: ["src", "test"] });
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Write guard updated"), "info");
+  });
+
+  it("+dir that already resolves to the same path is a no-op (dedup)", async () => {
+    await invoke(pi, "focus-write-guard", "src", createCtx({ cwd: tmpDir }));
+    await invoke(pi, "focus-write-guard", "+./src", createCtx({ cwd: tmpDir }));
+
+    expect(pi.appendEntry).toHaveBeenLastCalledWith("write-guard", { mode: "allow", dirs: ["src"] });
+  });
+
+  it("-dir removes from the active allowlist", async () => {
+    await invoke(pi, "focus-write-guard", "src test", createCtx({ cwd: tmpDir }));
+    const ctx = await invoke(pi, "focus-write-guard", "-src", createCtx({ cwd: tmpDir }));
+
+    expect(pi.appendEntry).toHaveBeenCalledWith("write-guard", { mode: "allow", dirs: ["test"] });
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Write guard updated"), "info");
+  });
+
+  it("removing the last entry is disallowed and leaves the list unchanged", async () => {
+    await invoke(pi, "focus-write-guard", "src", createCtx({ cwd: tmpDir }));
+    const ctx = await invoke(pi, "focus-write-guard", "-src", createCtx({ cwd: tmpDir }));
+
+    // List must remain [src]: a write outside [src] is still blocked.
+    const toolCall = pi._callbacks.tool_call[0];
+    const denied = await toolCall(
+      { toolName: "write", input: { path: path.join(tmpDir, "test/file.txt"), content: "data" } },
+      createCtx({ cwd: tmpDir }),
+    );
+    expect(denied).toEqual(expect.objectContaining({ block: true }));
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      "That would empty the allowlist. The list is unchanged.\n"
+        + "• disable the guard entirely  →  /focus-write-guard-all\n"
+        + "• set a new list              →  /focus-write-guard <dirs>",
+      "warning",
+    );
+  });
+
+  it("+dir turns the guard ON when it is currently off", async () => {
+    await invoke(pi, "focus-write-guard-all", "", createCtx({ hasUI: false, cwd: tmpDir }));
+    await invoke(pi, "focus-write-guard", "+src", createCtx({ cwd: tmpDir }));
+
+    expect(pi.appendEntry).toHaveBeenCalledWith("write-guard", { mode: "allow", dirs: ["src"] });
+    const toolCall = pi._callbacks.tool_call[0];
+    const denied = await toolCall(
+      { toolName: "write", input: { path: "/outside/file.txt", content: "data" } },
+      createCtx({ cwd: tmpDir }),
+    );
+    expect(denied).toEqual(expect.objectContaining({ block: true }));
+  });
+
+  it("unprefixed tokens still use SET mode (replace the whole list)", async () => {
+    await invoke(pi, "focus-write-guard", "src", createCtx({ cwd: tmpDir }));
+    const ctx = await invoke(pi, "focus-write-guard", "test", createCtx({ cwd: tmpDir }));
+
+    expect(pi.appendEntry).toHaveBeenCalledWith("write-guard", { mode: "allow", dirs: ["test"] });
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Write guard set for this session"), "info");
+  });
+
+  it("mixed prefixed/unprefixed tokens are rejected via the config-error path", async () => {
+    await invoke(pi, "focus-write-guard", "src", createCtx({ cwd: tmpDir }));
+    const ctx = await invoke(pi, "focus-write-guard", "+src docs", createCtx({ cwd: tmpDir }));
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Write guard configuration is invalid"), "error");
+  });
+
+  it("-dir that matches nothing is a no-op info notice naming the missing dir", async () => {
+    await invoke(pi, "focus-write-guard", "src", createCtx({ cwd: tmpDir }));
+    const ctx = await invoke(pi, "focus-write-guard", "-nosuch", createCtx({ cwd: tmpDir }));
+
+    // No new persist; the policy is still exactly [src].
+    const toolCall = pi._callbacks.tool_call[0];
+    const denied = await toolCall(
+      { toolName: "write", input: { path: path.join(tmpDir, "test/file.txt"), content: "data" } },
+      createCtx({ cwd: tmpDir }),
+    );
+    expect(denied).toEqual(expect.objectContaining({ block: true }));
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      "Not in the allowlist / nothing to remove: nosuch",
+      "info",
+    );
+  });
+
+  it("-dir while the guard is off yields the nothing-to-remove notice and does not set a session override", async () => {
+    await invoke(pi, "focus-write-guard-all", "", createCtx({ hasUI: false, cwd: tmpDir }));
+    const ctx = await invoke(pi, "focus-write-guard", "-src", createCtx({ cwd: tmpDir }));
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      "Not in the allowlist / nothing to remove: src",
+      "info",
+    );
+    // No write-guard entry persisted by the removal itself (only the off entry from /focus-write-guard-all).
+    expect(pi.appendEntry).toHaveBeenCalledWith("write-guard", { mode: "off" });
+    expect(pi.appendEntry).not.toHaveBeenCalledWith("write-guard", { mode: "allow", dirs: ["src"] });
+    // Guard is still off: a write outside any allowlist is not blocked.
+    const result = await pi._callbacks.tool_call[0](
+      { toolName: "write", input: { path: "/outside/file.txt", content: "data" } },
+      createCtx({ cwd: tmpDir }),
+    );
+    expect(result).toBeUndefined();
+  });
+
+  it("multi-token +a -b applies the add and the remove together", async () => {
+    await invoke(pi, "focus-write-guard", "src test", createCtx({ cwd: tmpDir }));
+    const ctx = await invoke(pi, "focus-write-guard", "+docs -src", createCtx({ cwd: tmpDir }));
+
+    // Resulting allowlist is [test, docs]: src removed, docs appended, order preserved.
+    expect(pi.appendEntry).toHaveBeenLastCalledWith("write-guard", { mode: "allow", dirs: ["test", "docs"] });
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Write guard updated"), "info");
+
+    // Behavior check: a write into test/ is allowed, into src/ is blocked.
+    const toolCall = pi._callbacks.tool_call[0];
+    await expect(toolCall(
+      { toolName: "write", input: { path: path.join(tmpDir, "test/file.txt"), content: "data" } },
+      createCtx({ cwd: tmpDir }),
+    )).resolves.toBeUndefined();
+    const denied = await toolCall(
+      { toolName: "write", input: { path: path.join(tmpDir, "src/file.txt"), content: "data" } },
+      createCtx({ cwd: tmpDir }),
+    );
+    expect(denied).toEqual(expect.objectContaining({ block: true }));
   });
 });

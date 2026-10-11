@@ -4,6 +4,8 @@ import type { Script } from "unbash";
 import {
   getEffectivePolicy as getWriteEffectivePolicy,
   parseDirsArgList,
+  parseIncrementalOps,
+  applyIncrementalOps,
   resolveAllowedDirs,
   formatResolvedList,
   requireNonEmptyDirs,
@@ -288,6 +290,76 @@ export default function focusGuard(pi: ExtensionAPI) {
         }
         const resolved = await resolveAllowedDirs(policy.dirs, ctx.cwd);
         ctx.ui.notify(`Write guard enforcing (source: ${policy.source}).\nAllowed under:\n${formatResolvedList(resolved)}\n\nTreat denied writes as policy boundaries, not technical failures to route around.`, "info");
+        return;
+      }
+
+      let ops: ReturnType<typeof parseIncrementalOps>;
+      try {
+        ops = parseIncrementalOps(argsTrimmed);
+      } catch (error) {
+        if (await reportWriteGuardConfigError(error, ctx)) return;
+        throw error;
+      }
+      if (ops !== null) {
+        const base = activeWritePolicy?.enforce ? activeWritePolicy.dirs : [];
+        const { dirs: newDirs, removedMissing } = await applyIncrementalOps(base, ops, ctx.cwd);
+
+        if (newDirs.length === 0 && base.length > 0) {
+          // Disallow the last removal — list unchanged.
+          if (ctx.hasUI) {
+            ctx.ui.notify(
+              "That would empty the allowlist. The list is unchanged.\n"
+                + "• disable the guard entirely  →  /focus-write-guard-all\n"
+                + "• set a new list              →  /focus-write-guard <dirs>",
+              "warning",
+            );
+          }
+          return;
+        }
+
+        if (newDirs.length === 0) {
+          // Base was empty — nothing to remove (or nothing matching anywhere).
+          if (ctx.hasUI) {
+            ctx.ui.notify(
+              removedMissing.length > 0
+                ? `Not in the allowlist / nothing to remove: ${removedMissing.join(", ")}`
+                : "Not in the allowlist / nothing to remove.",
+              "info",
+            );
+          }
+          return;
+        }
+
+        if (removedMissing.length > 0 && newDirs.length === base.length && newDirs.every((d, i) => d === base[i])) {
+          // No effective change: everything removed was missing and nothing was added.
+          if (ctx.hasUI) {
+            ctx.ui.notify(
+              `Not in the allowlist / nothing to remove: ${removedMissing.join(", ")}`,
+              "info",
+            );
+          }
+          return;
+        }
+
+        try {
+          writeSessionOverride = { mode: "allow", dirs: requireNonEmptyDirs(newDirs, "command") };
+          activeWritePolicy = { enforce: true, source: "session", dirs: writeSessionOverride.dirs };
+        } catch (error) {
+          if (await reportWriteGuardConfigError(error, ctx)) return;
+          throw error;
+        }
+        persistWriteOverride();
+        await updateWriteStatus(ctx);
+        if (ctx.hasUI) {
+          const resolved = await resolveAllowedDirs(newDirs, ctx.cwd);
+          const list = formatResolvedList(resolved);
+          const notRemovedNote = removedMissing.length > 0 ? `\nNot removed (not in allowlist): ${removedMissing.join(", ")}` : "";
+          ctx.ui.notify(`Write guard updated for this session.\nAllowed under:\n${list}${notRemovedNote}\n\nTreat denied writes as policy boundaries, not technical failures to route around.`, "info");
+          await pi.sendMessage(
+            { customType: WRITE_PERSIST_TYPE, content: `Write guard updated for this session.\nAllowed under:\n${list}${notRemovedNote}\n\nTreat denied writes as policy boundaries, not technical failures to route around.`, display: true },
+            { triggerTurn: false },
+          );
+        }
         return;
       }
 

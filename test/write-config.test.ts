@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { getEffectivePolicy, parseFlagAllowedDirs, parseDirsArgList, loadProjectAllowedDirs, WriteGuardConfigError } from "../src/write/config.js";
+import { getEffectivePolicy, parseFlagAllowedDirs, parseDirsArgList, parseIncrementalOps, applyIncrementalOps, loadProjectAllowedDirs, WriteGuardConfigError } from "../src/write/config.js";
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 
@@ -42,6 +42,96 @@ describe("write parseDirsArgList", () => {
 
 	it("handles mixed separators", () => {
 		expect(parseDirsArgList("docs , openspec   lib")).toEqual(["docs", "openspec", "lib"]);
+	});
+});
+
+describe("write parseIncrementalOps", () => {
+	it("parses add tokens", () => {
+		expect(parseIncrementalOps("+/tmp +/data")).toEqual([{ kind: "add", dir: "/tmp" }, { kind: "add", dir: "/data" }]);
+	});
+
+	it("parses remove tokens", () => {
+		expect(parseIncrementalOps("-/tmp")).toEqual([{ kind: "remove", dir: "/tmp" }]);
+	});
+
+	it("returns null for unprefixed tokens (SET mode)", () => {
+		expect(parseIncrementalOps("docs,openspec")).toBeNull();
+	});
+
+	it("returns null for an empty string", () => {
+		expect(parseIncrementalOps("")).toBeNull();
+	});
+
+	it("throws for mixed prefixed/unprefixed tokens", () => {
+		expect(() => parseIncrementalOps("+/tmp docs")).toThrow(WriteGuardConfigError);
+	});
+
+	it("throws for a bare '+' token", () => {
+		expect(() => parseIncrementalOps("+")).toThrow(WriteGuardConfigError);
+	});
+
+	it("throws for a bare '-' token", () => {
+		expect(() => parseIncrementalOps("-")).toThrow(WriteGuardConfigError);
+	});
+
+	it("preserves raw dir (e.g. ~/x)", () => {
+		expect(parseIncrementalOps("+~/x")).toEqual([{ kind: "add", dir: "~/x" }]);
+	});
+});
+
+describe("write applyIncrementalOps", () => {
+	let tmpDir: string;
+
+	beforeEach(async () => {
+		tmpDir = await fs.mkdtemp(path.join("/tmp", "pi-focus-incremental-test-"));
+		await fs.mkdir(path.join(tmpDir, "docs"), { recursive: true });
+		await fs.mkdir(path.join(tmpDir, "openspec"), { recursive: true });
+	});
+
+	afterEach(async () => {
+		try {
+			await fs.rm(tmpDir, { recursive: true, force: true });
+		}
+		catch {
+			// ignore
+		}
+	});
+
+	it("adds to an existing list", async () => {
+		const { dirs } = await applyIncrementalOps(["docs"], [{ kind: "add", dir: "openspec" }], tmpDir);
+		expect(dirs).toEqual(["docs", "openspec"]);
+	});
+
+	it("dedups an add by resolved path", async () => {
+		const { dirs } = await applyIncrementalOps(["docs"], [{ kind: "add", dir: "./docs" }], tmpDir);
+		expect(dirs).toEqual(["docs"]);
+	});
+
+	it("removes an existing dir (any spelling that resolves to the same path)", async () => {
+		const { dirs, removedMissing } = await applyIncrementalOps(["docs", "openspec"], [{ kind: "remove", dir: "./docs" }], tmpDir);
+		expect(dirs).toEqual(["openspec"]);
+		expect(removedMissing).toEqual([]);
+	});
+
+	it("records a remove that matches nothing in removedMissing", async () => {
+		const { dirs, removedMissing } = await applyIncrementalOps(["docs"], [{ kind: "remove", dir: "nope" }], tmpDir);
+		expect(dirs).toEqual(["docs"]);
+		expect(removedMissing).toEqual(["nope"]);
+	});
+
+	it("removing the last entry empties dirs", async () => {
+		const { dirs } = await applyIncrementalOps(["docs"], [{ kind: "remove", dir: "docs" }], tmpDir);
+		expect(dirs).toEqual([]);
+	});
+
+	it("applies mixed add+remove in order", async () => {
+		const { dirs, removedMissing } = await applyIncrementalOps(
+			["docs"],
+			[{ kind: "add", dir: "openspec" }, { kind: "remove", dir: "docs" }],
+			tmpDir,
+		);
+		expect(dirs).toEqual(["openspec"]);
+		expect(removedMissing).toEqual([]);
 	});
 });
 

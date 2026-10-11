@@ -58,7 +58,7 @@ pi -e /path/to/pi-focus-guard
 * **The Problem:** The agent strays outside the task scope, editing config files, dependencies, or unrelated folders.
 * **The Solution:** Restricts all filesystem modifications (`write`, `edit`, and shell redirections/mutations in `bash`) to an approved allowlist. Denials explain the boundary so the agent asks rather than hacking around it.
 * **Quick Use:**
-  * Commands: `/focus-write-guard src/auth,test/auth` · disable: `/focus-write-guard-all`
+  * Commands: `/focus-write-guard src/auth,test/auth` · incremental: `/focus-write-guard +docs` / `-docs` · disable: `/focus-write-guard-all`
   * Flags: `--write-guard src/auth,test/auth`, `--write-guard-all`
   * Config: Define `allowedDirs` in `.pi/settings.json`
 * 📖 *Full details:* [Write Guard in docs/features/write-guard.md](docs/features/write-guard.md)
