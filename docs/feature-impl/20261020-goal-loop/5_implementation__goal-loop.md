@@ -9,7 +9,7 @@ Date: 2026-10-20 · Status: **implemented (submit variant added 2026-10-11)** ·
   and the `_resetGoalLoopForTests()` seam.
 - **`src/focus-guard.ts`** — one-line wiring: `registerGoalLoop(pi)` at the end
   of the `focusGuard` entry (see deviation 1). No other changes.
-- **`test/goal-loop.test.ts`** — 24 tests: command registration (4 commands +
+- **`test/goal-loop.test.ts`** — 23 tests: command registration (4 commands +
   full entry), start/start-submit/end/show handling, 500-char rejection (and
   boundary acceptance), empty-definition usage message, submit routing
   (idle/busy), pre-submission validation for the submit variant, session-scoped
