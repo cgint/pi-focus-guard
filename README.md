@@ -50,7 +50,7 @@ pi -e /path/to/pi-focus-guard
   * Commands: `/focus-discuss read`, `/focus-discuss block`, `/focus-discuss off`
   * Inline in prompt: `-dr: investigate the failing test` *(read-only)* or `-db: plan the refactor` *(block)*
   * Flags: `--dm-read`, `--dm-block`, `--dm-off`
-* 📖 *Full details:* [Discuss Mode in docs/features.md](docs/features.md#discuss-mode)
+* 📖 *Full details:* [Discuss Mode in docs/features/discuss-mode.md](docs/features/discuss-mode.md)
 
 ---
 
@@ -61,7 +61,7 @@ pi -e /path/to/pi-focus-guard
   * Commands: `/focus-write-guard src/auth,test/auth`, `/focus-write-guard all`
   * Flags: `--write-guard src/auth,test/auth`, `--write-guard-all`
   * Config: Define `allowedDirs` in `.pi/settings.json`
-* 📖 *Full details:* [Write Guard in docs/features.md](docs/features.md#write-guard)
+* 📖 *Full details:* [Write Guard in docs/features/write-guard.md](docs/features/write-guard.md)
 
 ---
 
@@ -73,7 +73,7 @@ pi -e /path/to/pi-focus-guard
   * Arm passively: `/focus-goal-start <def>`
   * Ask for a proposal: `/focus-goal-suggest`
   * End goal: `/focus-goal-end`
-* 📖 *Full details:* [Goal Loop in docs/features.md](docs/features.md#goal-loop)
+* 📖 *Full details:* [Goal Loop in docs/features/goal-loop.md](docs/features/goal-loop.md)
 
 ---
 
@@ -83,7 +83,7 @@ pi -e /path/to/pi-focus-guard
 * **Quick Use:**
   * Commands: `/focus-crazy-find-guard-on`, `/focus-crazy-find-guard-off`
   * Flags: `--crazy-find-guard-off` *(opt-out)*
-* 📖 *Full details:* [Crazy-Find Guard in docs/features.md](docs/features.md#crazy-find-guard)
+* 📖 *Full details:* [Crazy-Find Guard in docs/features/crazy-find-guard.md](docs/features/crazy-find-guard.md)
 
 ---
 
@@ -93,7 +93,7 @@ pi -e /path/to/pi-focus-guard
 * **Quick Use:**
   * Commands: `/focus-commit-guard-on`, `/focus-commit-guard-off`, `/focus-commit-guard`
   * Flags: `--commit-guard-on`, `--commit-guard-off`
-* 📖 *Full details:* [Commit Guard in docs/features.md](docs/features.md#commit-guard)
+* 📖 *Full details:* [Commit Guard in docs/features/commit-guard.md](docs/features/commit-guard.md)
 
 ---
 
@@ -162,6 +162,6 @@ Switch mode directly inside any user message:
 
 ## Further Reading
 
-* [`docs/features.md`](docs/features.md) — Exhaustive technical reference (AST detection, config hierarchy, fail-fast rules, lifecycle invariants).
+* [`docs/features/`](docs/features/README.md) — Comprehensive technical specifications per focus feature group (AST detection, config hierarchy, fail-fast rules, lifecycle invariants).
 * [`docs/philosophy-and-north-star.md`](docs/philosophy-and-north-star.md) — The pairing philosophy: boundaries as collaboration signals, not cold blocks.
 * [`docs/parity-matrix.md`](docs/parity-matrix.md) — Parity matrix with predecessor extensions (`pi-write-guard`, `pi-discuss-mode`).
