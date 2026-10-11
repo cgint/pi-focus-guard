@@ -6,3 +6,6 @@ dist/
 *.log
 
 .codegiant/
+# cg-task.sh review outputs (transient local artifacts)
+cg-task-result-*.md
+._cg_tmp_*
