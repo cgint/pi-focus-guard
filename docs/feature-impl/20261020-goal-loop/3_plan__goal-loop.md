@@ -70,8 +70,8 @@ the agent what to decide). The agent self-evaluates — no separate classifier L
 ## In-repo integration points (verified present in pi-focus-guard)
 
 - **Command registration:** `pi.registerCommand` — already used for `/focus-write-guard`,
-  `/focus-discuss`, `/focus-commit-guard` in `src/focus-guard.ts`. `/goal-start`, `/goal-end`,
-  and `/goal` follow this exact pattern.
+  `/focus-discuss`, `/focus-commit-guard` in `src/focus-guard.ts`. `/focus-goal-start`,
+  `/focus-goal-end`, and `/focus-goal` follow this exact pattern.
 - **Status indicator:** `ctx.ui.setStatus` — already used for write-guard/discuss/commit
   status in `src/focus-guard.ts`. The goal-active indicator (shows the active goal / none)
   follows the same pattern.
@@ -87,7 +87,9 @@ the agent what to decide). The agent self-evaluates — no separate classifier L
    in *this* host, so the re-entrancy latch / "genuine user input" distinction is pinned
    exactly (needed if the budget is ever added back).
 3. **`agent_end` → retry interplay (sibling OQ3):** whether an auto-retry of a failed run
-   re-fires `agent_end` before `agent_settled` — could cause a double nudge. Unverified.
+   re-fires `agent_end` before `agent_settled` — could cause a double nudge. Unverified;
+   open item carried into v1 and deferred to a budget version (see
+   `5_implementation__goal-loop.md` → "Open items").
 
 ## Out of scope for v1 (deferred, not dropped)
 

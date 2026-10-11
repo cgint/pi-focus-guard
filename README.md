@@ -49,6 +49,9 @@ The intended command shape is:
 /focus-crazy-find-guard
 /focus-crazy-find-guard-on
 /focus-crazy-find-guard-off
+/focus-goal-start <definition>
+/focus-goal-end
+/focus-goal
 ```
 
 Startup flags can set the initial mode:
@@ -140,6 +143,22 @@ Normal, project-scoped searches (e.g. `find .`, `find ./src`, `find ~/dev/projec
 
 The crazy-find guard does not display a footer icon, keeping the bottom status bar clean.
 
+#### Goal loop
+
+```text
+/focus-goal-start <definition>
+/focus-goal-end
+/focus-goal
+```
+
+A session-scoped goal (a plain string of at most 500 characters, no conventions) describes an end state. While a goal is active, the moment the agent would hand control back to the user, it is nudged to cross-check the goal against the current state and decide: release to the user (genuinely done) or keep working (not done). The nudge carries the goal's own description verbatim and no verdict — the agent judges "done" itself, case by case, against what the goal states (a test that must pass, a plan that must be finished, a file that must exist, ...).
+
+- `/focus-goal-start <definition>` — start the goal and arm the turn-end cross-check (definition is trimmed; over 500 characters is rejected with an error; the agent is informed without starting a turn of its own).
+- `/focus-goal-end` — disarm and discard the goal without judging whether it was achieved.
+- `/focus-goal` — show the active goal's definition, or report that no goal is active.
+
+The goal is session-scoped: it does not persist to a project setting and does not survive a session restart. v1 has no cross-check budget or forced-release cap — at most one nudge per settled agent run while a goal is active, and the agent may release at any point it judges the goal reached. The footer status icon shows at a glance whether a goal is active: `🎯` means no goal, `⭕` means a goal is active.
+
 ## Successor plan
 
 `pi-focus-guard` is planned as the effective successor to:
@@ -173,4 +192,5 @@ Before treating this successor as ready, tests should show parity for retained b
 - commit guard blocking `git commit` while enabled;
 - commit guard allowing non-commit bash when enabled;
 - commit guard allowing `git commit` when disabled;
-- commit guard footer icon reflecting enabled/disabled state.
+- commit guard footer icon reflecting enabled/disabled state;
+- goal loop: start/end/show commands, 500-character limit, turn-end nudge with the goal verbatim, no nudge without an active goal, and latch re-arm after settle.

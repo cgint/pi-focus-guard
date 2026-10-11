@@ -81,6 +81,9 @@ describe("focus command surface", () => {
       "focus-discuss-block",
       "focus-discuss-off",
       "focus-discuss-read",
+      "focus-goal",
+      "focus-goal-end",
+      "focus-goal-start",
       "focus-write-guard",
       "focus-write-guard-all",
     ]);

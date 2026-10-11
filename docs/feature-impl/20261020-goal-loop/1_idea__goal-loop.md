@@ -65,10 +65,11 @@ level).
 
 ## Activation (settled — see requirements)
 
-Three commands, settled 2026-10-20: `/goal-start <definition-as-simple-string>` (arm),
-`/goal-end` (cancel), `/goal` (show). Session-scoped only (no project persistence).
-`<definition>` is a plain string, max 500 characters, no conventions. (This section
-previously guessed a single `/goal "..."` command; that form was superseded.)
+Three commands, settled 2026-10-20: `/focus-goal-start <definition-as-simple-string>` (arm),
+`/focus-goal-end` (cancel), `/focus-goal` (show). Session-scoped only (no project
+persistence). `<definition>` is a plain string, max 500 characters, no conventions.
+(This section previously guessed a single `/goal "..."` command; that form was
+superseded.) Command names amended to the `focus-` prefix on 2026-10-11.
 
 ## Open questions (historical — all settled, see `2_requirements__goal-loop.md` → "Resolved")
 
@@ -79,7 +80,7 @@ previously guessed a single `/goal "..."` command; that form was superseded.)
    no separate classifier, no extension-run check script in v1.
 2. **Budget** — Settled: none in v1 (agent is nudged and decides); loop-caps deferred to a
    possible later version (see `3_plan__goal-loop.md` → "Out of scope for v1").
-3. **Reset semantics** — Settled: the goal persists across turns until `/goal-end` or the
+3. **Reset semantics** — Settled: the goal persists across turns until `/focus-goal-end` or the
    agent releases; session-scoped.
 4. **Scope confirmation** — Settled: home is `pi-focus-guard` (confirmed).
 

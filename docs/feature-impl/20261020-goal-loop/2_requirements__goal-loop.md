@@ -1,6 +1,6 @@
 # goal-loop — requirements
 
-Date: 2026-10-20 · Status: **requirements (settled)** · Owner: Firstmate (user owns requirements)
+Date: 2026-10-20 · Status: **requirements (settled; command naming amended 2026-10-11)** · Owner: Firstmate (user owns requirements)
 
 > Non-technical, user-facing requirements only. Technical mechanism, hook choice, and
 > guard design live in `3_plan__goal-loop.md`.
@@ -19,22 +19,26 @@ handoff moment and decide: release to the user (genuinely done) or keep going (n
 1. **Define and end an active goal (session-scoped).** The user starts exactly one active
    goal for the session, describing an end state; and ends it. The goal exists only for the
    session — it is not persisted to a project setting and does not survive a restart.
-   Three commands (settled by user, 2026-10-20; distinct top-level names so autocomplete
-   lists all three and the user need not recall a suffix):
-   - `/goal-start <definition>` — start the goal; the turn-end cross-check is armed. The
-     definition is a simple string of at most 500 characters with no structured conventions
-     — the user writes the goal in plain language (see requirement 2a for what it may
-     describe).
-   - `/goal-end` — end (cancel) the goal; the cross-check is disarmed and the goal discarded
-     without judgment of whether it was achieved.
-   - `/goal` — show the current goal (the definition string) and its state (active or none).
-   An active goal stays in effect across turns until the user runs `/goal-end`.
+   Three commands (settled by user, 2026-10-20; **amended 2026-10-11: all user commands in
+   this repo are `focus-`-prefixed** — see `/focus-write-guard`, `/focus-discuss`,
+   `/focus-commit-guard`, `/focus-crazy-find-guard` — so the goal commands carry the same
+   prefix. Distinct top-level names so autocomplete lists all three and the user need not
+   recall a suffix):
+   - `/focus-goal-start <definition>` — start the goal; the turn-end cross-check is armed.
+     The definition is a simple string of at most 500 characters with no structured
+     conventions — the user writes the goal in plain language (see requirement 2a for what
+     it may describe).
+   - `/focus-goal-end` — end (cancel) the goal; the cross-check is disarmed and the goal
+     discarded without judgment of whether it was achieved.
+   - `/focus-goal` — show the current goal (the definition string) and its state (active
+     or none).
+   An active goal stays in effect across turns until the user runs `/focus-goal-end`.
 2. **The goal description is free text; "done" is defined by it, case by case.** The
    `<definition>` is a plain string — no flags, no syntax, no parsing conventions. Whatever
    makes the goal "complete" (a test that must pass, a plan that must be finished, a file
    that must exist, etc.) is stated in the goal description itself. The cross-check judges
    the goal against that description; there is no separate mechanical-vs-plan split enforced
-   by the feature. (e.g. `/goal-start "npm test passes and the migration is applied"`.)
+   by the feature. (e.g. `/focus-goal-start "npm test passes and the migration is applied"`.)
    - **2a. What the description may reference** — anything the user wants: a command to run,
      a plan file, a condition, or a combination. The feature does not interpret or validate
      the string; it passes the goal's own description to the cross-check.
@@ -45,8 +49,9 @@ handoff moment and decide: release to the user (genuinely done) or keep going (n
    forced-release cap in the first version. Each nudge asks the agent to reflect; the agent
    may release at any point it judges the goal reached, or keep going. (A budget/loop-guard
    is a possible later refinement, not part of v1 — see `3_plan__goal-loop.md`.)
-5. **User is always in control.** The user can end the turn, run `/goal-end`, or override the
-   outcome at any time. The goal-loop nudges the agent; it never locks the user out.
+5. **User is always in control.** The user can end the turn, run `/focus-goal-end`, or
+   override the outcome at any time. The goal-loop nudges the agent; it never locks the
+   user out.
 6. **Visible status.** The user can see at a glance whether a goal is active (and its
    definition) or that no goal is active.
 7. **Honest "done".** If the agent claims the goal is met but the evidence (per the goal's
@@ -63,18 +68,18 @@ handoff moment and decide: release to the user (genuinely done) or keep going (n
 
 ## Acceptance criteria (behavioral)
 
-- `/goal-start "<def>"` (a plain string, ≤500 chars) starts a session-scoped goal; the
+- `/focus-goal-start "<def>"` (a plain string, ≤500 chars) starts a session-scoped goal; the
   turn-end cross-check is armed for that goal.
 - With an active goal, at the moment the agent would return control, the agent is nudged to
   cross-check the goal and decides release vs. continue — the feature does not force a
   fixed number of re-checks in v1.
-- `/goal-end` immediately disarms the cross-check and clears the goal for the session.
-- `/goal` shows the active goal's definition, or "no active goal" when none is set.
+- `/focus-goal-end` immediately disarms the cross-check and clears the goal for the session.
+- `/focus-goal` shows the active goal's definition, or "no active goal" when none is set.
 - A goal does not survive a session restart (session-scoped only).
 - The goal description is passed through as-is (no parsing, no flag validation); a
   description over 500 characters is rejected with a clear message.
 
-## Resolved (2026-10-20, user decisions)
+## Resolved (2026-10-20, user decisions; amended 2026-10-11)
 
 1. **Home repo** — pi-focus-guard. Confirmed.
 2. **Persistence** — session-only; no project-setting form.
@@ -85,4 +90,9 @@ handoff moment and decide: release to the user (genuinely done) or keep going (n
 5. **Check-script robustness** — out of scope for this feature (the feature does not run or
    manage check scripts; that is the agent's / user's business).
 6. **Directory naming** — `20261020-goal-loop` (renamed from the erroneous `20260715`).
-7. **`/goal-start` grammar** — a simple string, no conventions, max 500 characters.
+7. **`/focus-goal-start` grammar** — a simple string, no conventions, max 500 characters.
+8. **Command naming (amendment, 2026-10-11, user)** — all user commands in this repo are
+   `focus-`-prefixed; the goal commands are therefore `/focus-goal-start`,
+   `/focus-goal-end`, `/focus-goal`. The original bare names (`/goal-start`, `/goal-end`,
+   `/goal`) were a mistake: they break the repo's naming convention and the
+   "registers only focus-prefixed user commands" test invariant.

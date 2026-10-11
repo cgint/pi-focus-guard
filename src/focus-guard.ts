@@ -23,6 +23,7 @@ import { isBashCommandReadOnly } from "./discuss/is-readonly.js";
 import { parseDiscussInputDirective } from "./discuss/input-directive.js";
 import { detectCrazyFind } from "./find/crazy-find-detect.js";
 import { formatCrazyFindBlockedReason, formatCrazyFindParseError } from "./find/format-deny.js";
+import { registerGoalLoop } from "./goal/goal.js";
 import * as os from "node:os";
 
 const WRITE_PERSIST_TYPE = "write-guard";
@@ -755,4 +756,7 @@ export default function focusGuard(pi: ExtensionAPI) {
 
     return undefined;
   });
+
+  // Goal-loop (last: existing tests index handlers by registration order).
+  registerGoalLoop(pi);
 }
