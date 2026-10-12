@@ -1,7 +1,7 @@
 # Known limitation — `sendUserMessage` throws during compaction
 
 Date: 2026-10-11 (upstream status updated 2026-10-11) ·
-Status: **live in pinned pi-coding-agent 1.1.0; upstream #8435 unresolved (auto-closed, not maintainer-adjudicated)** ·
+Status: **live in pinned pi-coding-agent 1.1.0; upstream #8435 closed `not_planned` — extension-side retry is the intended pattern** ·
 Scope: pi-focus-guard submit path (related pattern in pi-mini-self-org
 `user-pin-submit`, same root cause)
 
@@ -85,13 +85,13 @@ It is **not implemented here yet** — a deliberate deferral, not a rejection:
    use, implement the retry then (this doc is the spec). The #6728 flush-race
    fix landing in a pi release would lower the risk of doing so.
 
-## Upstream fix (not planned — extension responsibility)
+## Ideal upstream fix (for reference, not expectation)
 
 `prompt()` should route `streamingBehavior === "followUp"` into `_queueFollowUp`
 *before* the compaction guard (guard reorder + regression test). #6728's flush
-race is already fixed on main. Until the guard reorder lands, extensions cannot
-queue user messages across compaction via the public API — so the working
-extension-side pattern above is the interim reality.
+race is already fixed on main. Upstream has explicitly declined this (#8435,
+`not_planned`), so the working extension-side pattern above is the permanent
+reality, not an interim stopgap.
 
 ## Mitigation today
 
