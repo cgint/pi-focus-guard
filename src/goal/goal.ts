@@ -138,9 +138,10 @@ export function registerGoalLoop(pi: ExtensionAPI): void {
       startGoal(definition, ctx);
       // Submit the definition as a user-role message (no template expansion): idle → sent
       // immediately as a new turn; busy → queued as a follow-up so it is not lost.
-      // Known limitation (upstream #8435): during an in-flight compaction, sendUserMessage
-      // hard-throws before the followUp queue is reached, so the trigger is dropped while
-      // the goal stays armed. See docs/feature-impl/20261011-goal-loop/6_known-limitation__compaction-submit.md.
+      // Known limitation (live in pinned pi-coding-agent 1.1.0; upstream #8435 auto-closed,
+      // not maintainer-adjudicated — guard re-verified present): during an in-flight compaction,
+      // sendUserMessage hard-throws before the followUp queue is reached, so the trigger is
+      // dropped while the goal stays armed. See docs/feature-impl/20261011-goal-loop/6_known-limitation__compaction-submit.md.
       if (ctx.isIdle()) {
         await pi.sendUserMessage(definition, { expandPromptTemplates: false });
       } else {

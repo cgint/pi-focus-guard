@@ -1,7 +1,9 @@
 # Known limitation — `sendUserMessage` throws during compaction
 
-Date: 2026-10-11 · Status: **open (upstream)** · Scope: pi-focus-guard submit path
-(related pattern in pi-mini-self-org `user-pin-submit`, same root cause)
+Date: 2026-10-11 (upstream status updated 2026-10-11) ·
+Status: **live in pinned pi-coding-agent 1.1.0; upstream #8435 unresolved (auto-closed, not maintainer-adjudicated)** ·
+Scope: pi-focus-guard submit path (related pattern in pi-mini-self-org
+`user-pin-submit`, same root cause)
 
 ## Symptom
 
@@ -39,38 +41,57 @@ The interactive TUI avoids this via an internal buffer
 (`queueCompactionMessage(text, "followUp")`, flushed on `compaction_end`),
 but that buffer is **not exposed** to the extension API.
 
-## Upstream references
+## Upstream references (status verified 2026-10-11 via `gh api`)
 
 - [#8435](https://github.com/earendil-works/pi/issues/8435) — "sendUserMessage
-  during compaction throws instead of queueing (inconsistent with streaming
-  behavior)" (open)
+  during compaction throws instead of queueing." **Closed `not_planned` on
+  2026-08-21, but auto-closed by `github-actions[bot]` (new-contributor default),
+  NOT a maintainer product decision.** No fix in the 1.1.0 dist this repo pins
+  (guard re-verified present). May be reopened by daily maintainer review.
+- [#6728](https://github.com/earendil-works/pi/issues/6728) — TUI
+  `flushCompactionQueue` races the resumed agent and drops queued messages.
+  **Fixed on main** (maintainer `badlogic`: "Fixed on main") — the flush race
+  has a real upstream fix, though it may not be in 1.1.0 yet.
+- [#6820](https://github.com/earendil-works/pi/issues/6820) — queued message
+  dropped after threshold auto-compaction. Auto-closed (new-contributor
+default); author actively contesting the `no-action` label.
 - [#8687](https://github.com/earendil-works/pi/issues/8687) — `deliverAs:
-  followUp/steer` throws 'already processing' during active run (queue bypassed)
-- [#6820](https://github.com/earendil-works/pi/issues/6820) / [#6728](https://github.com/earendil-works/pi/issues/6728)
-  — TUI's own `flushCompactionQueue` races the resumed agent and can drop
-  queued messages ("Agent is already processing")
+  followUp/steer` throws 'already processing' during an *active run* (not
+  compaction). Closed "cannot reproduce" by a contributor (contested); the
+  1.1.0 dist still exhibits the active-run throw, so treat as unresolved for
+  our purposes.
 
-## Why no extension-side workaround (deliberate)
+**Net:** the compaction guard (#8435) is a live, *unadjudicated* upstream gap —
+nor is it "upstream declined to fix." Do not read the closed state as a
+rejection.
 
-A catch-and-retry on `compaction_end` is possible (catch the specific
-compaction error, stash the pending submit, re-fire on `compaction_end` with
-an `aborted` check) but is rejected as the design because:
+## Working extension-side pattern (deliberately NOT yet implemented)
 
-1. It duplicates queue state the core already owns (the TUI buffer), and would
-   have to be deleted when upstream lands — a two-repo divergence.
-2. Even after #8435 is fixed, #6820's flush race means post-compaction delivery
-   is not bulletproof; the extension-side buffer inherits the same race.
-3. It is a hack by this repo's standard: the submit path is correct for the
-   non-compaction case (the 99.9% case); the compaction case is a core
-   limitation, not a feature defect.
+Because #8435 is unadjudicated (not a firm "won't fix"), the extension-side
+retry is the *pragmatic* path other extensions ship, not a rejected hack. The
+pattern (used by #8687's author and others): gate delivery on `agent_settled`
++ `ctx.isIdle()` + try/catch on the compaction error, then re-fire the stashed
+submit on `compaction_end` (checking `aborted`).
 
-## Proper fix (upstream)
+It is **not implemented here yet** — a deliberate deferral, not a rejection:
+
+1. **Scope:** the compaction-in-flight submit is a rare edge (the 99.9% case is
+   non-compaction, where the current path is correct). Adding retry state to
+   handle a rare transient phase is not worth it until the feature needs it.
+2. **Race surface:** a self-maintained buffer duplicates queue state the core
+   owns and reintroduces a #6820-style flush race unless carefully ordered
+   against `compaction_end`/`agent_settled` and the `aborted` flag.
+3. **Revisit trigger:** if a goal/pin is repeatedly lost mid-compaction in real
+   use, implement the retry then (this doc is the spec). The #6728 flush-race
+   fix landing in a pi release would lower the risk of doing so.
+
+## Proper fix (upstream — the ideal, still outstanding for the guard)
 
 `prompt()` should route `streamingBehavior === "followUp"` into `_queueFollowUp`
-*before* the compaction guard (guard reorder + regression test), and the
-`flushCompactionQueue` race (#6820) needs fixing so queued-after-compaction
-delivery is reliable. Until both land, extensions cannot queue user messages
-across compaction via the public API.
+*before* the compaction guard (guard reorder + regression test). #6728's flush
+race is already fixed on main. Until the guard reorder lands, extensions cannot
+queue user messages across compaction via the public API — so the working
+extension-side pattern above is the interim reality.
 
 ## Mitigation today
 

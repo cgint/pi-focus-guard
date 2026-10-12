@@ -95,13 +95,14 @@ Date: 2026-10-20 · Status: **implemented (submit variant added 2026-10-11)** ·
 
 ## Known Limitations
 
-- **Compaction-in-flight submit is dropped (upstream).** While a session
+- **Compaction-in-flight submit is dropped (live upstream gap).** While a session
   compaction is in flight, `pi.sendUserMessage` throws before the followUp
-  queue is reached (upstream #8435), so `/focus-goal-start-submit` and
+  queue is reached (upstream #8435 — auto-closed, *not* maintainer-adjudicated;
+  guard still present in pinned 1.1.0), so `/focus-goal-start-submit` and
   `/focus-goal-suggest` arm/prompt but the trigger turn is not started. The
   goal stays armed and the next `agent_end` nudge re-arms the cross-check. No
-  extension-side workaround is implemented (deliberate). Full analysis,
-  upstream refs, and rationale: see
+  extension-side retry is implemented (deliberate deferral). Full analysis,
+  verified upstream status, and the working retry pattern: see
   [`6_known-limitation__compaction-submit.md`](6_known-limitation__compaction-submit.md).
 
 ## Checks
