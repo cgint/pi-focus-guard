@@ -61,15 +61,15 @@ default); author actively contesting the `no-action` label.
   1.1.0 dist still exhibits the active-run throw, so treat as unresolved for
   our purposes.
 
-**Net:** the compaction guard (#8435) is a live, *unadjudicated* upstream gap —
-nor is it "upstream declined to fix." Do not read the closed state as a
-rejection.
+**Net:** #8435 was closed `not_planned` on 2026-08-21. The extension-side retry
+pattern is the intended, permanent solution — not a temporary workaround awaiting
+an upstream fix. Upstream has explicitly punted this to extensions.
 
-## Working extension-side pattern (deliberately NOT yet implemented)
+## Extension-side retry pattern (intended solution, not yet implemented)
 
-Because #8435 is unadjudicated (not a firm "won't fix"), the extension-side
-retry is the *pragmatic* path other extensions ship, not a rejected hack. The
-pattern (used by #8687's author and others): gate delivery on `agent_settled`
+Because #8435 was closed `not_planned` (upstream explicitly declined to fix), the
+extension-side retry is the *intended* pattern, not a rejected hack. The pattern
+(used by #8687's author and others): gate delivery on `agent_settled`
 + `ctx.isIdle()` + try/catch on the compaction error, then re-fire the stashed
 submit on `compaction_end` (checking `aborted`).
 
@@ -85,7 +85,7 @@ It is **not implemented here yet** — a deliberate deferral, not a rejection:
    use, implement the retry then (this doc is the spec). The #6728 flush-race
    fix landing in a pi release would lower the risk of doing so.
 
-## Proper fix (upstream — the ideal, still outstanding for the guard)
+## Upstream fix (not planned — extension responsibility)
 
 `prompt()` should route `streamingBehavior === "followUp"` into `_queueFollowUp`
 *before* the compaction guard (guard reorder + regression test). #6728's flush
